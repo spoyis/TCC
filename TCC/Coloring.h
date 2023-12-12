@@ -118,15 +118,3 @@ namespace Coloring {// begin namespace Coloring
 
 
 }// end namespace Coloring
-
-
-/*
-  EXAMPLE USAGE:
-
-  1  Graph<int,int> g(5); // creates graph with 5 vertices with type int for vertices/edges.
-  2  // ** populate graph with edges **
-  3  Checker checker(g,5);
-  4  checker.zykov(Heuristic::firstValid, Heuristic::naiveEval);
-
-
-*/
