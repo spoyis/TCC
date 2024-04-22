@@ -18,6 +18,11 @@ int main() {
   Coloring::Checker<Graph<int,int>, int> checker(&g, 2);
   std::cout << checker.run() << '\n';
 
+  Graph<int, std::vector<int>> g2(5);
+  g2.joinVertexData(1, 2);
+  Coloring::Checker<Graph<int, std::vector<int>>, int> grobaupau(&g2, 5);
+  grobaupau.run();
+
   try {
     DIMACS::Parser<Graph<int, int>> parser;
     Graph<int, int> g2 = parser.parse();

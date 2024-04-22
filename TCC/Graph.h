@@ -3,6 +3,7 @@
 #include <iostream>
 #include "TypeValues.h"
 #include "UnionFind.h"
+#include <vector>
 
 template <typename edge, typename vertex>
 class Graph { // begin class Graph
@@ -118,6 +119,23 @@ public:
 
 		_vertexVal->unionOp(root1, root2);
 		joinEdgeData(std::min(index1, index2), std::max(index1, index2));
+		joinVertexData(std::min(index1, index2), std::max(index1, index2));
+	}
+
+	void joinVertexData(int index1, int index2) {
+		// se edge_t for um std::vector
+		// --> faço interseção de std::vectors
+		// se ele não for um std::vector
+		// kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+		
+
+		// for std::vector, intersect.
+		if (is_specialization<vertex, std::vector>::value) {
+			std::cout << "Given type is an std::vector." << std::endl;
+		}
+		else {
+			std::cout << "Given type is not an std::vector." << std::endl;
+		}
 	}
 
 	void joinEdgeData(int index1, int index2) {
