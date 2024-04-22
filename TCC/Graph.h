@@ -124,6 +124,10 @@ public:
 		for (long i = 0; i < _vertexCount; i++) {
 			this->operator[](index1)[i] = this->operator[](index2)[i];
 		}
+
+		for (long i = 0; i < _vertexCount; i++) {
+			this->operator[](i)[index1] = this->operator[](i)[index2];
+		}
 	}
 
 	int getRoot(int index) {

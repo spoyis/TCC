@@ -10,10 +10,10 @@ int main() {
   TestSuite::run<float>("float");
 
   Graph<int, int> g(2);
-  g[0][1] = 0;
-  g[1][1] = 0;
-  g[1][1] = 0;
-  g[1][0] = 0;
+  g[0][1] = 1;
+  g[1][1] = 1;
+  g[1][1] = 1;
+  g[1][0] = 1;
 
   Coloring::Checker<Graph<int,int>, int> checker(&g, 2);
   std::cout << checker.run() << '\n';
