@@ -20,9 +20,6 @@ public:
 		this->_size = other._size;
     this->setSize = other.setSize;
 
-    // why tf isn't this nulling the "other" ptrs?, am I fucking stupid?
-    // yes.
-
     other.parent = nullptr;
     other.data = nullptr;
     other.setSize = nullptr;

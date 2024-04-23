@@ -122,25 +122,74 @@ public:
 		joinVertexData(std::min(index1, index2), std::max(index1, index2));
 	}
 
-	bool areJoinable(int index1, int index2) {
-		if (is_specialization<vertex, std::vector>::value) {
-			std::cout << "Given type is an std::vector." << std::endl;
+
+	bool areJoinable(int index1, int index2){
+		return areJoinableHelper<vertex>(index1, index2);
+	}
+
+
+	template <class Vector>
+	typename std::enable_if<is_specialization<Vector, std::vector>::value, bool>::type
+	areJoinableHelper(int index1, int index2) {
+		UnionFind<vertex>& unionfind = *_vertexVal;
+		long minSize = unionfind.getSize(index1) + unionfind.getSize(index2);
+		long size = 0;
+
+		for (auto color_1: unionfind[index1]) {
+			for (auto color_2 : unionfind[index2]) {
+				if (color_1 == color_2) { size++; break; }
+			}
+
+			if (size == minSize) return true;
 		}
-		else {
+
+		return false;
+	}
+
+	template<typename vertex_t>
+	typename std::enable_if<!is_specialization<vertex_t, std::vector>::value, bool>::type
+	areJoinableHelper(int index1, int index2) {
 			return true;
-		}
 	}
 
+	// BEGIN JOINVERTEXDATA METHODS
 	void joinVertexData(int index1, int index2) {
+		UnionFind<vertex>& unionfind = *_vertexVal;
+		vertex& v1 = unionfind[index1];
+		vertex& v2 = unionfind[index1];
 
-		// for std::vector, intersect.
-		if (is_specialization<vertex, std::vector>::value) {
-			std::cout << "Given type is an std::vector." << std::endl;
-		}
-		else {
-			std::cout << "Given type is not an std::vector." << std::endl;
-		}
+		joinVertexDataHelper<vertex>(v1, v2);
 	}
+	// -- Template method for any std::vector, calculates intersection.
+	template <class Vector>
+	typename std::enable_if<is_specialization<Vector, std::vector>::value>::type
+	joinVertexDataHelper(Vector v1, const Vector v2) {
+		auto right = v1.size();
+		long left = 0;
+
+		while(left < right) {
+			auto currentElement = v1[left];
+			bool found = false;
+			for (auto otherElement : v2) {
+				if (currentElement == otherElement) {
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				std::swap(v1[left], v1[--right]);
+			}
+			else left++;
+		}
+		v1.resize(right);
+	}
+	// -- OVERLOADED FOR NON STD::VECTORS
+	template<typename vertex_t>
+	typename std::enable_if<!is_specialization<vertex_t, std::vector>::value>::type
+	joinVertexDataHelper(const vertex_t& v1, const vertex_t&v2) {
+		std::cout << "Given type is not an std::vector... method not implemented lol" << std::endl;
+	}
+	// END JOINVERTEXDATA METHODS 
 
 	void joinEdgeData(int index1, int index2) {
 		for (long i = 0; i < _vertexCount; i++) {

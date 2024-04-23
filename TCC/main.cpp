@@ -10,10 +10,16 @@ int main() {
   TestSuite::run<float>("float");
 
   Graph<int, int> g(2);
-  g[0][1] = 1;
-  g[1][1] = 1;
+  g[0][1] = 0;
+  g[1][1] = 0;
   g[1][1] = 1;
   g[1][0] = 1;
+
+  // instancio grafo
+  // instacio outro grafo
+
+  // faço um grafo receber o outro
+  // não vai copiar, mais fazer o movimento.
 
   Coloring::Checker<Graph<int,int>, int> checker(&g, 2);
   std::cout << checker.run() << '\n';
@@ -23,11 +29,11 @@ int main() {
   Coloring::Checker<Graph<int, std::vector<int>>, int> grobaupau(&g2, 5);
   grobaupau.run();
 
-  try {
-    DIMACS::Parser<Graph<int, int>> parser;
-    Graph<int, int> g2 = parser.parse();
-  }
-  catch (const std::exception& e) {
-    std::cerr << "CAUGHT: " << e.what() << std::endl;
-  }
+ // try {
+ //   DIMACS::Parser<Graph<int, int>> parser;
+  //  Graph<int, int> g2 = parser.parse();
+ // }
+ // catch (const std::exception& e) {
+  //  std::cerr << "CAUGHT: " << e.what() << std::endl;
+ // }
 }

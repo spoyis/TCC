@@ -25,7 +25,7 @@ namespace Coloring::Heuristic
         long root1 = g.getRoot(i);
         long root2 = g.getRoot(j);
         if (root1 == root2) continue;
-        if (evalfunc(g[root1][root2])) return { root1,root2 };
+        if (evalfunc(g[root1][root2]) and g.areJoinable(root1, root2)) return { root1,root2 };
       }
         
 

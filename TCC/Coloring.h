@@ -118,3 +118,12 @@ namespace Coloring {// begin namespace Coloring
 
 
 }// end namespace Coloring
+
+
+
+// problema:
+// existe a possibilidade de que:
+// -- em um determinado grafo, não exista dois pares de vertices tais que a interseção das duas listas de cores é valido.
+// -- logo, o zykov não vai encontrar folhas para a subarvore desse grafo.
+// -- mesmo que, o zykov poderia continuar explorando, pelo menos a escolha de adicionar aresta e não contrair os vertices.
+// -- isso seria valido? não sei.
