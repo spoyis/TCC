@@ -122,12 +122,16 @@ public:
 		joinVertexData(std::min(index1, index2), std::max(index1, index2));
 	}
 
+	bool areJoinable(int index1, int index2) {
+		if (is_specialization<vertex, std::vector>::value) {
+			std::cout << "Given type is an std::vector." << std::endl;
+		}
+		else {
+			return true;
+		}
+	}
+
 	void joinVertexData(int index1, int index2) {
-		// se edge_t for um std::vector
-		// --> faço interseção de std::vectors
-		// se ele não for um std::vector
-		// kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
-		
 
 		// for std::vector, intersect.
 		if (is_specialization<vertex, std::vector>::value) {

@@ -7,9 +7,10 @@ class UnionFind
 public:
   UnionFind(long n) : _size(n){
 		parent = new long[_size];
+    setSize = new long[_size];
 		data = new T[_size];
 
-    for (long i = 0; i < _size; i++) parent[i] = i;
+    for (long i = 0; i < _size; i++) { parent[i] = i; setSize[i] = 1; }
 	}
 
 	// Move constructor
@@ -17,11 +18,20 @@ public:
 		this->parent = other.parent;
 		this->data = other.data;
 		this->_size = other._size;
+    this->setSize = other.setSize;
+
+    // why tf isn't this nulling the "other" ptrs?, am I fucking stupid?
+    // yes.
+
+    other.parent = nullptr;
+    other.data = nullptr;
+    other.setSize = nullptr;
 	}
 
   ~UnionFind() {
     delete[] data;
     delete[] parent;
+    delete[] setSize;
   }
 
   // Overloaded for lvalue
@@ -43,9 +53,11 @@ public:
       // Prioritize the smallest index as the root.
       if (root1 < root2) {
         parent[root2] = root1;
+        setSize[root2] += setSize[root1];
       }
       else {
         parent[root1] = root2;
+        setSize[root1] += setSize[root2];
       }
     }
   }
@@ -59,12 +71,17 @@ public:
     return index;
   }
 
+  long getSize(long index) {
+    return setSize[findRoot(index)];
+  }
+
   UnionFind* clone() {
     UnionFind* copy = new UnionFind(_size);
 
     for (long i = 0; i < _size; i++) {
       copy->data[i] = this->data[i];
       copy->parent[i] = this->parent[i];
+      copy->setSize[i] = this->setSize[i];
     }
 
     return copy;
@@ -73,6 +90,7 @@ public:
 private:
   long _size;
   long* parent;
+  long* setSize;
   T* data;
 
   T findOp(std::size_t index) const {
