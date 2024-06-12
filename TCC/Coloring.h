@@ -1,6 +1,7 @@
 #pragma once
 #include "Heuristics.h"
 #include "Graph.h"
+#include "BipartiteMatching.h"
 
 namespace Coloring {// begin namespace Coloring
 
@@ -51,12 +52,20 @@ namespace Coloring {// begin namespace Coloring
   template<class graph_t, typename color>
   class Checker<graph_t, color>::Zykov  
   { // begin class Coloring::Checker::Zykov
+    enum PruneMotive {
+      not_pruned, bad_clique_contraction, no_valid_intermediate_coloring, no_valid_final_coloring
+    };
+
   private:
     long _currentVertexCount;
     long _rightmostVertexIndex;
     long _bestAnswer;
     Graph<edge, vertex>* _graph;
     Checker* _checkerPtr;
+    bool _isValidNode{true};
+    PruneMotive pruneMotive{ not_pruned };
+    
+    
     // consider saving information to make/unmake changes to graph when searching through zykov tree.
 
   public:
@@ -106,11 +115,19 @@ namespace Coloring {// begin namespace Coloring
       _graph = g.cloneHeap();
 
       Graph<edge, vertex>& graph = *_graph;
+
+      // check bipartite matching before
+      //BipartiteMatching cliqueColoring;
+      
       graph.joinVertices(vertices.first, vertices.second);
       _checkerPtr = parent->_checkerPtr;
       _currentVertexCount = parent->_currentVertexCount - 1;
       _bestAnswer = parent->_bestAnswer;
       _rightmostVertexIndex = parent->_rightmostVertexIndex;
+
+      // check bipartite matching after.
+      //BipartiteMatching validColoring;
+
     }
 
   }; // end class Coloring::Checker::Zykov
@@ -118,12 +135,3 @@ namespace Coloring {// begin namespace Coloring
 
 
 }// end namespace Coloring
-
-
-
-// problema:
-// existe a possibilidade de que:
-// -- em um determinado grafo, não exista dois pares de vertices tais que a interseção das duas listas de cores é valido.
-// -- logo, o zykov não vai encontrar folhas para a subarvore desse grafo.
-// -- mesmo que, o zykov poderia continuar explorando, pelo menos a escolha de adicionar aresta e não contrair os vertices.
-// -- isso seria valido? não sei.

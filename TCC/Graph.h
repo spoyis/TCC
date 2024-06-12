@@ -127,12 +127,23 @@ public:
 		return areJoinableHelper<vertex>(index1, index2);
 	}
 
+	std::vector<long> neighboringVertices(int vertex) {
+		std::vector<long> output;
+		const edge* matrix = (edge*)adjMatrix;
+		for (long i = 0; i < _vertexCount; i++) {
+			if (i == vertex) continue;
+			if (matrix[vertex * _vertexCount + i]) output.push_back(i);
+		}
+
+		return output;
+	}
+
 
 	template <class Vector>
 	typename std::enable_if<is_specialization<Vector, std::vector>::value, bool>::type
 	areJoinableHelper(int index1, int index2) {
 		UnionFind<vertex>& unionfind = *_vertexVal;
-		long minSize = unionfind.getSize(index1) + unionfind.getSize(index2);
+		long minSize = 1;
 		long size = 0;
 
 		for (auto color_1: unionfind[index1]) {

@@ -130,6 +130,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="AdjacencyMatrix.h" />
+    <ClInclude Include="BipartiteMatching.h" />
     <ClInclude Include="Coloring.h" />
     <ClInclude Include="DIMACS.h" />
     <ClInclude Include="Graph.h" />
