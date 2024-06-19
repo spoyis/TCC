@@ -234,9 +234,4 @@ protected:
 }; // end class Graph
 
 #include "AdjacencyMatrix.h"
-// G
-// escolher dois vertices não adjacentes
-// ---> contrai
-// ---> adiciona aresta
-
 // DIMACS
