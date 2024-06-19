@@ -9,12 +9,44 @@ namespace Coloring {// begin namespace Coloring
   template<class graph_t, typename color>
   class Checker {// begin class Coloring::Checker
   public:
-    Checker(graph_t* graph, int size) {
+    Checker(graph_t* graph, std::vector<std::vector<long>> roomData) 
+      : roomData(graph->getVertexCount()),
+        optimizationStrategies( 1, false )
+    {
       _originalGraph = graph;
-      _initialVertexCount = _bestAnswer = size;
+      _initialVertexCount = _bestAnswer = _originalGraph->getVertexCount();
+
+      for (long vertex = 0; vertex < _initialVertexCount; vertex++) {
+        this->roomData[vertex] = std::move(roomData[vertex]);
+      }
+    }
+
+    enum OptimizationStrategy {
+      ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS = 0,
+    };
+
+    Checker(graph_t* graph, std::vector<std::vector<long>> roomData, std::vector<OptimizationStrategy> strategies)
+      : roomData(graph->getVertexCount()),
+        optimizationStrategies(1, false) 
+    {
+      _originalGraph = graph;
+      _initialVertexCount = _bestAnswer = _originalGraph->getVertexCount();
+
+      for (long vertex = 0; vertex < _initialVertexCount; vertex++) {
+        this->roomData[vertex] = std::move(roomData[vertex]);
+      }
+
+      for (auto& strategy : strategies) {
+        this->optimizationStrategies[strategy] = true;
+      }
     }
 
     int run() {
+      if (isEnabled(ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS)) {
+        std::cout << optimizationStrategies[0] << " THE FUCK\n";
+        sameTimeDifferentRoomsOptimization();
+      }
+
       Zykov* root = new Zykov(_originalGraph->cloneHeap(), _initialVertexCount, this);
       int result = root->run(getStrategy(), getEval());
       delete root;
@@ -31,6 +63,8 @@ namespace Coloring {// begin namespace Coloring
     Graph<edge, vertex>* _originalGraph;
     Heuristic::Enums strategy{ Heuristic::STRATEGY_DEFAULT };
     Heuristic::Enums eval{ Heuristic::EVAL_DEFAULT };
+    std::vector<bool> optimizationStrategies;
+    std::vector<std::vector<long>> roomData;
 
     Heuristic::strategy<edge,vertex> getStrategy() {
       switch (strategy) {
@@ -43,6 +77,32 @@ namespace Coloring {// begin namespace Coloring
       switch (eval) {
       case Heuristic::EVAL_NAIVE:
         return &Coloring::Heuristic::naiveEval<edge>;
+      }
+    }
+
+    bool isEnabled(OptimizationStrategy givenStrategy) {
+      return optimizationStrategies[givenStrategy];
+    }
+
+    void sameTimeDifferentRoomsOptimization() {
+      std::vector<std::pair<long, long>> nonNeighbors;
+      Graph<edge, vertex>& graph = *_originalGraph;
+
+      for (long i = 0; i < _initialVertexCount; i++)
+        for (long j = 0; j < _initialVertexCount; j++) {
+          if (i == j) continue;
+          if (roomData[i].size() > 1 || roomData[j].size() > 1) continue;
+
+          if (!graph[i][j]) nonNeighbors.push_back({ i,j });
+        }
+      for (auto& vertexPair : nonNeighbors) {
+        auto v1 = vertexPair.first;
+        auto v2 = vertexPair.second;
+
+        if (roomData[v1][0] == roomData[v2][0]) {
+          _originalGraph[v1][v2] = {1};
+          _originalGraph[v2][v1] = {1};
+        }
       }
     }
 
@@ -115,9 +175,6 @@ namespace Coloring {// begin namespace Coloring
       _graph = g.cloneHeap();
 
       Graph<edge, vertex>& graph = *_graph;
-
-      // check bipartite matching before
-      //BipartiteMatching cliqueColoring;
       
       graph.joinVertices(vertices.first, vertices.second);
       _checkerPtr = parent->_checkerPtr;
@@ -125,13 +182,8 @@ namespace Coloring {// begin namespace Coloring
       _bestAnswer = parent->_bestAnswer;
       _rightmostVertexIndex = parent->_rightmostVertexIndex;
 
-      // check bipartite matching after.
-      //BipartiteMatching validColoring;
-
     }
 
   }; // end class Coloring::Checker::Zykov
-
-
-
 }// end namespace Coloring
+

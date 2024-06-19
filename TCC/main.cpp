@@ -9,20 +9,19 @@ int main() {
   TestSuite::run<int>("int");
   TestSuite::run<bool>("boolean");
   TestSuite::run<float>("float");
-  /*
+
+  
   Graph<int, int> g(2);
   g[0][1] = 0;
   g[1][1] = 0;
   g[1][1] = 1;
   g[1][0] = 1;
-  
-  Coloring::Checker<Graph<int,int>, int> checker(&g, 2);
+  std::vector<std::vector<long>> lol(2);
+  Coloring::Checker<Graph<int,int>, int> checker(&g, lol);
   std::cout << checker.run() << '\n';
 
-  Graph<int, std::vector<int>> g2(5);
-  g2.joinVertexData(1, 2);
 
-  */
+  
  // try {
  //   DIMACS::Parser<Graph<int, int>> parser;
   //  Graph<int, int> g2 = parser.parse();
@@ -31,7 +30,6 @@ int main() {
   //  std::cerr << "CAUGHT: " << e.what() << std::endl;
  // }
   /**/
-
 
   long n,m, t;
   std::cin >> t;

@@ -109,6 +109,8 @@ public:
 		return _vertexVal->operator[](index);
 	}
 
+	auto getVertexCount() { return _vertexCount; };
+
 	void setVertexData(int index, vertex data) {
 		_vertexVal->operator[](index) = data;
 	}
