@@ -1,0 +1,103 @@
+HEADER classrooms 5 timeslots 7 classes 5 restrictions 4
+
+// CLASS LABELS  
+label class CORE_CENTER_prof_GARCIA_horario_1
+label class BRANCH_A_prof_RODRIGUEZ_horario_1
+label class BRANCH_B_prof_MARTINEZ_horario_1
+label class BRANCH_C_prof_ANDERSON_horario_1
+label class BRANCH_D_prof_THOMAS_horario_1
+
+// TIMESLOT LABELS
+label timeslot timeslot_7:00
+label timeslot timeslot_9:00
+label timeslot timeslot_13:00
+label timeslot timeslot_15:00
+label timeslot timeslot_17:00
+label timeslot timeslot_19:00
+label timeslot timeslot_21:00
+
+// ROOM LABELS
+label room LAB_1
+label room LAB_2
+label room LAB_3
+label room LAB_4
+label room LAB_5
+
+// ADDING TIMESLOTS FOR EACH CLASS (all classes can use all timeslots)
+class CORE_CENTER_prof_GARCIA_horario_1 add timeslot timeslot_7:00
+class CORE_CENTER_prof_GARCIA_horario_1 add timeslot timeslot_9:00
+class CORE_CENTER_prof_GARCIA_horario_1 add timeslot timeslot_13:00
+class CORE_CENTER_prof_GARCIA_horario_1 add timeslot timeslot_15:00
+class CORE_CENTER_prof_GARCIA_horario_1 add timeslot timeslot_17:00
+class CORE_CENTER_prof_GARCIA_horario_1 add timeslot timeslot_19:00
+class CORE_CENTER_prof_GARCIA_horario_1 add timeslot timeslot_21:00
+
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add timeslot timeslot_7:00
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add timeslot timeslot_9:00
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add timeslot timeslot_13:00
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add timeslot timeslot_15:00
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add timeslot timeslot_17:00
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add timeslot timeslot_19:00
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add timeslot timeslot_21:00
+
+class BRANCH_B_prof_MARTINEZ_horario_1 add timeslot timeslot_7:00
+class BRANCH_B_prof_MARTINEZ_horario_1 add timeslot timeslot_9:00
+class BRANCH_B_prof_MARTINEZ_horario_1 add timeslot timeslot_13:00
+class BRANCH_B_prof_MARTINEZ_horario_1 add timeslot timeslot_15:00
+class BRANCH_B_prof_MARTINEZ_horario_1 add timeslot timeslot_17:00
+class BRANCH_B_prof_MARTINEZ_horario_1 add timeslot timeslot_19:00
+class BRANCH_B_prof_MARTINEZ_horario_1 add timeslot timeslot_21:00
+
+class BRANCH_C_prof_ANDERSON_horario_1 add timeslot timeslot_7:00
+class BRANCH_C_prof_ANDERSON_horario_1 add timeslot timeslot_9:00
+class BRANCH_C_prof_ANDERSON_horario_1 add timeslot timeslot_13:00
+class BRANCH_C_prof_ANDERSON_horario_1 add timeslot timeslot_15:00
+class BRANCH_C_prof_ANDERSON_horario_1 add timeslot timeslot_17:00
+class BRANCH_C_prof_ANDERSON_horario_1 add timeslot timeslot_19:00
+class BRANCH_C_prof_ANDERSON_horario_1 add timeslot timeslot_21:00
+
+class BRANCH_D_prof_THOMAS_horario_1 add timeslot timeslot_7:00
+class BRANCH_D_prof_THOMAS_horario_1 add timeslot timeslot_9:00
+class BRANCH_D_prof_THOMAS_horario_1 add timeslot timeslot_13:00
+class BRANCH_D_prof_THOMAS_horario_1 add timeslot timeslot_15:00
+class BRANCH_D_prof_THOMAS_horario_1 add timeslot timeslot_17:00
+class BRANCH_D_prof_THOMAS_horario_1 add timeslot timeslot_19:00
+class BRANCH_D_prof_THOMAS_horario_1 add timeslot timeslot_21:00
+
+// ADDING CLASSROOMS FOR EACH CLASS (all classes can use all rooms)
+class CORE_CENTER_prof_GARCIA_horario_1 add room LAB_1
+class CORE_CENTER_prof_GARCIA_horario_1 add room LAB_2
+class CORE_CENTER_prof_GARCIA_horario_1 add room LAB_3
+class CORE_CENTER_prof_GARCIA_horario_1 add room LAB_4
+class CORE_CENTER_prof_GARCIA_horario_1 add room LAB_5
+
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add room LAB_1
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add room LAB_2
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add room LAB_3
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add room LAB_4
+class BRANCH_A_prof_RODRIGUEZ_horario_1 add room LAB_5
+
+class BRANCH_B_prof_MARTINEZ_horario_1 add room LAB_1
+class BRANCH_B_prof_MARTINEZ_horario_1 add room LAB_2
+class BRANCH_B_prof_MARTINEZ_horario_1 add room LAB_3
+class BRANCH_B_prof_MARTINEZ_horario_1 add room LAB_4
+class BRANCH_B_prof_MARTINEZ_horario_1 add room LAB_5
+
+class BRANCH_C_prof_ANDERSON_horario_1 add room LAB_1
+class BRANCH_C_prof_ANDERSON_horario_1 add room LAB_2
+class BRANCH_C_prof_ANDERSON_horario_1 add room LAB_3
+class BRANCH_C_prof_ANDERSON_horario_1 add room LAB_4
+class BRANCH_C_prof_ANDERSON_horario_1 add room LAB_5
+
+class BRANCH_D_prof_THOMAS_horario_1 add room LAB_1
+class BRANCH_D_prof_THOMAS_horario_1 add room LAB_2
+class BRANCH_D_prof_THOMAS_horario_1 add room LAB_3
+class BRANCH_D_prof_THOMAS_horario_1 add room LAB_4
+class BRANCH_D_prof_THOMAS_horario_1 add room LAB_5
+
+// ADDING RESTRICTIONS (star graph - center node connects to all branches)
+// Chromatic number = 2 (center gets one room, all branches can share another room)
+restriction star_edge_1 add CORE_CENTER_prof_GARCIA_horario_1 BRANCH_A_prof_RODRIGUEZ_horario_1
+restriction star_edge_2 add CORE_CENTER_prof_GARCIA_horario_1 BRANCH_B_prof_MARTINEZ_horario_1
+restriction star_edge_3 add CORE_CENTER_prof_GARCIA_horario_1 BRANCH_C_prof_ANDERSON_horario_1
+restriction star_edge_4 add CORE_CENTER_prof_GARCIA_horario_1 BRANCH_D_prof_THOMAS_horario_1

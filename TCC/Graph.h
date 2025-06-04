@@ -4,6 +4,10 @@
 #include "TypeValues.h"
 #include "UnionFind.h"
 #include <vector>
+#include <random>
+
+
+std::mt19937 gen(5489); // RNG
 
 template <typename edge, typename vertex>
 class Graph { // begin class Graph
@@ -13,11 +17,13 @@ private:
 public:
 	using edge_t = edge;
 	using vertex_t = vertex;
+	using clique_t = std::vector<long>;
 	
 
 	Graph(int n) {
 		adjMatrix = new(n) AdjacencyMatrix;
 		_vertexVal = new UnionFind<vertex>(n);
+		_vertexLabels = std::make_shared<std::vector<std::string>>(n);
 		_vertexCount = n;
 	}
 
@@ -39,6 +45,7 @@ public:
 		this->_vertexVal = other._vertexVal;
 		this->adjMatrix = other.adjMatrix;
 		this->_vertexCount = other._vertexCount;
+		this->_vertexLabels = std::move(other._vertexLabels);
 
 		adjMatrix->graphObj = this;
 		other.adjMatrix = nullptr;
@@ -104,12 +111,17 @@ public:
 		return new Graph(*this);
 	}
 
-	// returns copy of current vertex data
-	vertex getVertexData(int index) const {
+	// returns REFERENCE of current vertex data
+	vertex& getVertexData(int index) const {
 		return _vertexVal->operator[](index);
 	}
 
 	auto getVertexCount() { return _vertexCount; };
+	std::string getVertexLabel(int index) { return (*_vertexLabels)[index]; }
+
+	void setVertexLabel(std::string label, int index) {
+		(*_vertexLabels)[index] = label;
+	}
 
 	void setVertexData(int index, vertex data) {
 		_vertexVal->operator[](index) = data;
@@ -140,22 +152,49 @@ public:
 		return output;
 	}
 
+	long findCliqueGreedy() {
+
+	}
+
+	clique_t findCliqueRandom() {
+		
+		std::uniform_int_distribution<> distrib(0, _vertexCount - 1);
+		int randomNumber = this->getRoot(distrib(gen));
+
+		clique_t clique{ randomNumber };
+		
+		for (long i = 0; i < _vertexCount; i++) {
+			bool flag = true;
+			auto rootI = this->getRoot(i);
+			if (rootI < i) continue;
+			for (long j = 0; j < clique.size(); j++) {
+				int cliqueVertex = clique[j];
+				if (cliqueVertex == rootI || !this->operator[](rootI)[cliqueVertex]) {
+					flag = false;
+					break;
+				}
+			}
+
+			if (flag) {
+				clique.push_back(rootI);
+			}
+		}
+		return clique;
+	}
+
 
 	template <class Vector>
 	typename std::enable_if<is_specialization<Vector, std::vector>::value, bool>::type
 	areJoinableHelper(int index1, int index2) {
 		UnionFind<vertex>& unionfind = *_vertexVal;
-		long minSize = 1;
-		long size = 0;
 
-		for (auto color_1: unionfind[index1]) {
-			for (auto color_2 : unionfind[index2]) {
-				if (color_1 == color_2) { size++; break; }
+		for (const auto& color_1 : unionfind[index1]) {
+			for (const auto& color_2 : unionfind[index2]) {
+				if (color_1 == color_2) {
+					return true;
+				}
 			}
-
-			if (size == minSize) return true;
 		}
-
 		return false;
 	}
 
@@ -200,17 +239,17 @@ public:
 	template<typename vertex_t>
 	typename std::enable_if<!is_specialization<vertex_t, std::vector>::value>::type
 	joinVertexDataHelper(const vertex_t& v1, const vertex_t&v2) {
-		std::cout << "Given type is not an std::vector... method not implemented lol" << std::endl;
+		std::cout << "Given type is not an std::vector... method not implemented lol (ignore this line)" << std::endl;
 	}
 	// END JOINVERTEXDATA METHODS 
 
 	void joinEdgeData(int index1, int index2) {
 		for (long i = 0; i < _vertexCount; i++) {
-			this->operator[](index1)[i] = this->operator[](index2)[i];
+			this->operator[](index1)[i] |= this->operator[](index2)[i];
 		}
 
 		for (long i = 0; i < _vertexCount; i++) {
-			this->operator[](i)[index1] = this->operator[](i)[index2];
+			this->operator[](i)[index1] |= this->operator[](i)[index2];
 		}
 	}
 
@@ -218,10 +257,20 @@ public:
 		return _vertexVal->findRoot(index);
 	}
 
+	long getVertexDegree(int index) {
+		long output = 0;
+		for (long i = 0; i < _vertexCount; i++) {
+			if (this->operator[](index)[i] && i != index) output++;
+		}
+		return output;
+	}
+
 private:
 	AdjacencyMatrix* adjMatrix;
 	UnionFind<vertex>* _vertexVal;
 	int _vertexCount;
+	std::shared_ptr<std::vector<std::string>> _vertexLabels;
+
 
 protected:
 	// copy constructor privated, helps to not call it by mistake in the code, should you WANT to use it, refer to clone method instead.
@@ -229,6 +278,7 @@ protected:
 		_vertexCount = other._vertexCount;
 		adjMatrix = other.adjMatrix->clone(_vertexCount);
 		_vertexVal = other._vertexVal->clone();
+		_vertexLabels = other._vertexLabels;
 		//adjMatrix->graphObj = this;
 	}
 }; // end class Graph

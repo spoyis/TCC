@@ -2,6 +2,8 @@
 #include <iostream>
 #include "Graph.h"
 #include <string>
+#include "Coloring.h"
+#include "InputParser.h"
 
 namespace TestSuite { // begin namespace TestSuite
 
@@ -35,16 +37,67 @@ namespace TestSuite { // begin namespace TestSuite
     testCompleteGraphValidation<T>(10);
     testGraphCloning<T>();
   }
+
+
   
 
-  void expect(const char* outputText, bool expectedValue, bool receivedValue) {
+  template<typename T>
+  void expect(const char* outputText, const T& expectedValue, const T& receivedValue) {
     if (receivedValue == expectedValue) {
       std::cout << PASS << outputText << std::endl;
+      totalPasses++;
     }
     else {
-      std::cout << FAIL << outputText << std::endl;
+      std::cout << FAIL << outputText
+        << " (Expected: " << expectedValue << ", Got: " << receivedValue << ")"
+        << std::endl;
+      totalFailss++;
     }
   }
+
+
+  void runChecker() {
+    std::cout << color::blue << "STARTING CHECKER TESTS\n" << color::reset;
+
+    {
+      std::cout << color::cyan << "  -> TRIANGLE GRAPH 1:\n" << color::reset;
+      auto parser = input::Parser("test_1.txt");
+      parser.parse();
+
+      auto checker = parser.getChecker();
+      checker.setStrategy(Coloring::Heuristic::STRATEGY_LOWEST_DEGREE);
+      int result = checker.run();
+
+      expect("Test 1 should return a minimum coloring of 3", 3, result);
+    }
+
+    {
+      std::cout << color::cyan << "  -> TEST 2:\n" << color::reset;
+      auto parser = input::Parser("test_2.txt");
+      parser.parse();
+
+      auto checker = parser.getChecker();
+      checker.setStrategy(Coloring::Heuristic::STRATEGY_LOWEST_DEGREE);
+      int result = checker.run();
+
+      expect("Test 2 should return a minimum coloring of 2", 2, result);
+    }
+
+    {
+      std::cout << color::cyan << "  -> TEST 3:\n" << color::reset;
+      auto parser = input::Parser("test_3.txt");
+      parser.parse();
+
+      auto checker = parser.getChecker();
+      checker.setStrategy(Coloring::Heuristic::STRATEGY_LOWEST_DEGREE);
+      int result = checker.run();
+
+      expect("Test 3 should return a minimum coloring of 2", 2, result);
+    }
+
+    std::cout << color::blue << "CHECKER TESTS COMPLETE\n" << color::reset;
+  }
+
 
   template<typename T>
   Graph<T, T> generateCompleteGraph(int size) {

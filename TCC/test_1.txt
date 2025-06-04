@@ -1,0 +1,68 @@
+HEADER classrooms 3 timeslots 7 classes 3 restrictions 3
+
+// CLASS LABELS
+label class MATH_A_prof_SMITH_horario_1
+label class PHYS_B_prof_JONES_horario_1
+label class CHEM_C_prof_BROWN_horario_1
+
+// TIMESLOT LABELS
+label timeslot timeslot_7:00
+label timeslot timeslot_9:00
+label timeslot timeslot_13:00
+label timeslot timeslot_15:00
+label timeslot timeslot_17:00
+label timeslot timeslot_19:00
+label timeslot timeslot_21:00
+
+// ROOM LABELS
+label room ROOM_1
+label room ROOM_2
+label room ROOM_3
+
+// ADDING TIMESLOTS FOR EACH CLASS (all classes can use all timeslots)
+class MATH_A_prof_SMITH_horario_1 add timeslot timeslot_7:00
+class MATH_A_prof_SMITH_horario_1 add timeslot timeslot_9:00
+class MATH_A_prof_SMITH_horario_1 add timeslot timeslot_13:00
+class MATH_A_prof_SMITH_horario_1 add timeslot timeslot_15:00
+class MATH_A_prof_SMITH_horario_1 add timeslot timeslot_17:00
+class MATH_A_prof_SMITH_horario_1 add timeslot timeslot_19:00
+class MATH_A_prof_SMITH_horario_1 add timeslot timeslot_21:00
+
+class PHYS_B_prof_JONES_horario_1 add timeslot timeslot_7:00
+class PHYS_B_prof_JONES_horario_1 add timeslot timeslot_9:00
+class PHYS_B_prof_JONES_horario_1 add timeslot timeslot_13:00
+class PHYS_B_prof_JONES_horario_1 add timeslot timeslot_15:00
+class PHYS_B_prof_JONES_horario_1 add timeslot timeslot_17:00
+class PHYS_B_prof_JONES_horario_1 add timeslot timeslot_19:00
+class PHYS_B_prof_JONES_horario_1 add timeslot timeslot_21:00
+
+class CHEM_C_prof_BROWN_horario_1 add timeslot timeslot_7:00
+class CHEM_C_prof_BROWN_horario_1 add timeslot timeslot_9:00
+class CHEM_C_prof_BROWN_horario_1 add timeslot timeslot_13:00
+class CHEM_C_prof_BROWN_horario_1 add timeslot timeslot_15:00
+class CHEM_C_prof_BROWN_horario_1 add timeslot timeslot_17:00
+class CHEM_C_prof_BROWN_horario_1 add timeslot timeslot_19:00
+class CHEM_C_prof_BROWN_horario_1 add timeslot timeslot_21:00
+
+// ADDING CLASSROOMS FOR EACH CLASS (all classes can use all rooms)
+class MATH_A_prof_SMITH_horario_1 add room ROOM_1
+class MATH_A_prof_SMITH_horario_1 add room ROOM_2
+class MATH_A_prof_SMITH_horario_1 add room ROOM_3
+
+class PHYS_B_prof_JONES_horario_1 add room ROOM_1
+class PHYS_B_prof_JONES_horario_1 add room ROOM_2
+class PHYS_B_prof_JONES_horario_1 add room ROOM_3
+
+class CHEM_C_prof_BROWN_horario_1 add room ROOM_1
+class CHEM_C_prof_BROWN_horario_1 add room ROOM_2
+class CHEM_C_prof_BROWN_horario_1 add room ROOM_3
+
+// ADDING RESTRICTIONS (triangle graph - all classes conflict with each other)
+restriction conflict_1 add MATH_A_prof_SMITH_horario_1 PHYS_B_prof_JONES_horario_1
+restriction conflict_2 add PHYS_B_prof_JONES_horario_1 CHEM_C_prof_BROWN_horario_1  
+restriction conflict_3 add MATH_A_prof_SMITH_horario_1 CHEM_C_prof_BROWN_horario_1
+
+
+// SIMPLE TEST
+// THIS IS A TRIANGLE GRAPH
+// CHROMATIC NUMBER = 3

@@ -1,0 +1,82 @@
+HEADER classrooms 4 timeslots 7 classes 4 restrictions 3
+
+// CLASS LABELS
+label class CALC_A_prof_TAYLOR_horario_1
+label class STAT_B_prof_DAVIS_horario_1
+label class ALGE_C_prof_MILLER_horario_1
+label class GEOM_D_prof_WILSON_horario_1
+
+// TIMESLOT LABELS
+label timeslot timeslot_7:00
+label timeslot timeslot_9:00
+label timeslot timeslot_13:00
+label timeslot timeslot_15:00
+label timeslot timeslot_17:00
+label timeslot timeslot_19:00
+label timeslot timeslot_21:00
+
+// ROOM LABELS
+label room ROOM_A
+label room ROOM_B
+label room ROOM_C
+label room ROOM_D
+
+// ADDING TIMESLOTS FOR EACH CLASS (all classes can use all timeslots)
+class CALC_A_prof_TAYLOR_horario_1 add timeslot timeslot_7:00
+class CALC_A_prof_TAYLOR_horario_1 add timeslot timeslot_9:00
+class CALC_A_prof_TAYLOR_horario_1 add timeslot timeslot_13:00
+class CALC_A_prof_TAYLOR_horario_1 add timeslot timeslot_15:00
+class CALC_A_prof_TAYLOR_horario_1 add timeslot timeslot_17:00
+class CALC_A_prof_TAYLOR_horario_1 add timeslot timeslot_19:00
+class CALC_A_prof_TAYLOR_horario_1 add timeslot timeslot_21:00
+
+class STAT_B_prof_DAVIS_horario_1 add timeslot timeslot_7:00
+class STAT_B_prof_DAVIS_horario_1 add timeslot timeslot_9:00
+class STAT_B_prof_DAVIS_horario_1 add timeslot timeslot_13:00
+class STAT_B_prof_DAVIS_horario_1 add timeslot timeslot_15:00
+class STAT_B_prof_DAVIS_horario_1 add timeslot timeslot_17:00
+class STAT_B_prof_DAVIS_horario_1 add timeslot timeslot_19:00
+class STAT_B_prof_DAVIS_horario_1 add timeslot timeslot_21:00
+
+class ALGE_C_prof_MILLER_horario_1 add timeslot timeslot_7:00
+class ALGE_C_prof_MILLER_horario_1 add timeslot timeslot_9:00
+class ALGE_C_prof_MILLER_horario_1 add timeslot timeslot_13:00
+class ALGE_C_prof_MILLER_horario_1 add timeslot timeslot_15:00
+class ALGE_C_prof_MILLER_horario_1 add timeslot timeslot_17:00
+class ALGE_C_prof_MILLER_horario_1 add timeslot timeslot_19:00
+class ALGE_C_prof_MILLER_horario_1 add timeslot timeslot_21:00
+
+class GEOM_D_prof_WILSON_horario_1 add timeslot timeslot_7:00
+class GEOM_D_prof_WILSON_horario_1 add timeslot timeslot_9:00
+class GEOM_D_prof_WILSON_horario_1 add timeslot timeslot_13:00
+class GEOM_D_prof_WILSON_horario_1 add timeslot timeslot_15:00
+class GEOM_D_prof_WILSON_horario_1 add timeslot timeslot_17:00
+class GEOM_D_prof_WILSON_horario_1 add timeslot timeslot_19:00
+class GEOM_D_prof_WILSON_horario_1 add timeslot timeslot_21:00
+
+// ADDING CLASSROOMS FOR EACH CLASS (all classes can use all rooms)
+class CALC_A_prof_TAYLOR_horario_1 add room ROOM_A
+class CALC_A_prof_TAYLOR_horario_1 add room ROOM_B
+class CALC_A_prof_TAYLOR_horario_1 add room ROOM_C
+class CALC_A_prof_TAYLOR_horario_1 add room ROOM_D
+
+class STAT_B_prof_DAVIS_horario_1 add room ROOM_A
+class STAT_B_prof_DAVIS_horario_1 add room ROOM_B
+class STAT_B_prof_DAVIS_horario_1 add room ROOM_C
+class STAT_B_prof_DAVIS_horario_1 add room ROOM_D
+
+class ALGE_C_prof_MILLER_horario_1 add room ROOM_A
+class ALGE_C_prof_MILLER_horario_1 add room ROOM_B
+class ALGE_C_prof_MILLER_horario_1 add room ROOM_C
+class ALGE_C_prof_MILLER_horario_1 add room ROOM_D
+
+class GEOM_D_prof_WILSON_horario_1 add room ROOM_A
+class GEOM_D_prof_WILSON_horario_1 add room ROOM_B
+class GEOM_D_prof_WILSON_horario_1 add room ROOM_C
+class GEOM_D_prof_WILSON_horario_1 add room ROOM_D
+
+// ADDING RESTRICTIONS (path graph: A-B-C-D)
+// Chromatic number = 2 (alternating rooms work: A and C can share, B and D can share)
+restriction path_edge_1 add CALC_A_prof_TAYLOR_horario_1 STAT_B_prof_DAVIS_horario_1
+restriction path_edge_2 add STAT_B_prof_DAVIS_horario_1 ALGE_C_prof_MILLER_horario_1
+restriction path_edge_3 add ALGE_C_prof_MILLER_horario_1 GEOM_D_prof_WILSON_horario_1

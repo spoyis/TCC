@@ -4,23 +4,15 @@
 #include "Graph.h"
 #include "DIMACS.h"
 #include "BipartiteMatching.h"
+#include "InputParser.h"
+
 
 int main() {
   TestSuite::run<int>("int");
   TestSuite::run<bool>("boolean");
   TestSuite::run<float>("float");
-
+  TestSuite::runChecker();
   
-  Graph<int, int> g(2);
-  g[0][1] = 0;
-  g[1][1] = 0;
-  g[1][1] = 1;
-  g[1][0] = 1;
-  std::vector<std::vector<long>> lol(2);
-  Coloring::Checker<Graph<int,int>, int> checker(&g, lol);
-  std::cout << checker.run() << '\n';
-
-
   
  // try {
  //   DIMACS::Parser<Graph<int, int>> parser;
@@ -31,41 +23,23 @@ int main() {
  // }
   /**/
 
-  long n,m, t;
-  std::cin >> t;
-  std::cin >> n;
-  
-  std::vector<long> conjuntoN;
-  std::vector<long> conjuntoM;
+  try {
+   
 
-  for (long i = 0; i < n; i++)
-  {
-    long buffer;
-    std::cin >> buffer;
-    conjuntoN.push_back(buffer);
+    std::cout << "BEGIN PARSING INPUT\n";
+    auto parser = input::Parser(std::string("output_Sun Sep 15 2024.txt"));
+    parser.parse();
+    std::cout << "INPUT SUCCESSFULLY PARSED\n";
+
+    std::cout << "PROBLEM CHECKER BEGIN PROCESSING\n";
+    auto checker = parser.getChecker();
+    //checker.setStrategy(Coloring::Heuristic::STRATEGY_LOWEST_DEGREE);
+    checker.setOptimizationStrategy(Coloring::ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS, true);
+    auto result = checker.run();
+    std::cout << "PROBLEM CHECKER FINISHED PROCESSING --- MIN COLORING VALUE IS " << result << "\n";
   }
-
-  std::cin >> m;
-  BipartiteMatching teste(n, m);
-  for (long i = 0; i < m; i++) {
-    long buffer;
-    std::cin >> buffer;
-    conjuntoM.push_back(buffer);
+  catch (const std::exception& e) {
+    std::cerr << "\nCAUGHT: " << e.what() << std::endl;
   }
-
-  // cruzar os dois 
-
-  for (long i = 0; i < n; i++) {
-    teste.defineInitialCapacity(i, 1);
-    for (long j = 0; j < m; j++) {
-      if (conjuntoM[j] % conjuntoN[i] == 0) {
-        teste.addEdge(i, j);
-        std::cout << conjuntoN[i] << "  " << conjuntoM[j] << '\n';
-      }
-    }
-  }
-
-  auto resultado = teste.solve();
-  std::cout << resultado << std::endl;
 }
 

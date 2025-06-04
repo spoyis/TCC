@@ -110,6 +110,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <StackReserveSize>16777216</StackReserveSize>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -126,6 +127,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <StackReserveSize>16777216</StackReserveSize>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -135,9 +137,11 @@
     <ClInclude Include="DIMACS.h" />
     <ClInclude Include="Graph.h" />
     <ClInclude Include="Heuristics.h" />
+    <ClInclude Include="InputParser.h" />
     <ClInclude Include="TestSuite.h" />
     <ClInclude Include="TypeValues.h" />
     <ClInclude Include="UnionFind.h" />
+    <ClInclude Include="validator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
