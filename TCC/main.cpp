@@ -11,7 +11,7 @@ int main() {
   TestSuite::run<int>("int");
   TestSuite::run<bool>("boolean");
   TestSuite::run<float>("float");
-  TestSuite::runChecker();
+  //TestSuite::runChecker();
   
   
  // try {

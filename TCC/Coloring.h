@@ -82,9 +82,15 @@ namespace Coloring {// begin namespace Coloring
       while (!searchQueue.empty()) {
         Zykov* current = searchQueue.top();
         searchQueue.pop();
-        if (step % 100 == 0) {
-          std::cout << "STEP " << step++ << " LOWERBOUND == " << current->getLowerBound() << " UPPERBOUND == " << current->getUpperBound() << '\n';
-          std::cout << "BESTANSWER: " << _bestAnswer << "\n";
+        if (step % 500 == 0) {
+          std::cout << "[CHECKER] STEP " << step++ << " LOWERBOUND == " << current->getLowerBound() << " UPPERBOUND == " << current->getUpperBound() << '\n';
+          std::cout << "[CHECKER] BESTANSWER: " << _bestAnswer << "\n";
+          std::cout << "[CHECKER] NODE STATS:\n";
+          std::cout << "[CHECKER][VALID NODES]: " << processedNodeStatistics[Validator::VALID] << '\n';
+          std::cout << "[CHECKER][TIMESLOT][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_PIGEONHOLE] << '\n';
+          std::cout << "[CHECKER][TIMESLOT][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_COLORING] << '\n';
+          std::cout << "[CHECKER][ROOM][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE] << '\n';
+          std::cout << "[CHECKER][ROOM][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_ROOM_COLORING] << '\n';
         }
         else step++;
        
@@ -99,11 +105,13 @@ namespace Coloring {// begin namespace Coloring
 
         // Process current node
         auto result = current->processNode(getStrategy(), getEval(), searchQueue);
-
-        auto upperBound = current->getUpperBound();
-        if (current->getLowerBound() == current->getUpperBound()) {
-          _bestAnswer = std::min(_bestAnswer, current->getUpperBound());
+        if(result == Validator::VALID){
+          auto upperBound = current->getUpperBound();
+          if (current->getLowerBound() == current->getUpperBound()) {
+            _bestAnswer = std::min(_bestAnswer, current->getUpperBound());
+          }
         }
+        processedNodeStatistics[result]++;
 
         delete current;
       }
@@ -137,6 +145,7 @@ namespace Coloring {// begin namespace Coloring
     Heuristic::Enums eval{ Heuristic::EVAL_DEFAULT };
     std::vector<bool> optimizationStrategies;
     std::vector<std::vector<long>> roomData;
+    std::vector<long> processedNodeStatistics{0,0,0,0,0};
 
     // Statistics
     long nodesExplored = 0;
@@ -183,11 +192,7 @@ namespace Coloring {// begin namespace Coloring
           graph[v2][v1] = {1};
 
           std::cout << "[OPTIMIZING] CLASS " << graph.getVertexLabel(v1) << " AND " << graph.getVertexLabel(v2) << " SHARE THE SAME ONE ROOM\n";
-          std::cout << "[DEBUG] Added edge between " << v1 << " and " << v2 << std::endl;
-          // Verify the edge was added
-          if (graph[v1][v2] && graph[v2][v1]) {
-            std::cout << "[DEBUG] Edge confirmed present" << std::endl;
-          }
+          //std::cout << "[DEBUG] Added edge between " << v1 << " and " << v2 << std::endl;
         }
       }
     }
@@ -237,10 +242,9 @@ namespace Coloring {// begin namespace Coloring
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator>& searchQueue) {
 
       auto clique = (*_graph).findCliqueRandom();
-
-      if (!Validator::clique<edge, vertex>(clique, *_graph)) {
-        std::cout << "PRUNING\n";
-        return -1;
+      auto cliqueValidation = Validator::clique<edge, vertex>(clique, *_graph, _checkerPtr->roomData);
+      if (cliqueValidation != Validator::VALID) {
+        return cliqueValidation;
       }
       _lowerBound = std::max(_lowerBound, (double)clique.size());
 
@@ -253,7 +257,7 @@ namespace Coloring {// begin namespace Coloring
           std::cout << "GRAFO COMPLETO\n";
           return _currentVertexCount;
         }
-        return -1;
+        return Validator::VALID;
       }
 
       //std::cout << "FOUND " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
@@ -271,7 +275,7 @@ namespace Coloring {// begin namespace Coloring
         }
       }
       
-      return _upperBound;
+      return Validator::VALID;
     }
 
   private:
@@ -323,12 +327,9 @@ namespace Coloring {// begin namespace Coloring
 
       Graph<edge, vertex>& graph = *_graph;
       auto& roomData = parent->_checkerPtr->roomData;
-      if (roomData[vertices.first].size() == 1 && roomData[vertices.second].size() == 1 && roomData[vertices.second] == roomData[vertices.first]) {
-        std::cout << "BAD! " << graph.getVertexLabel(vertices.first) << " AND " << graph.getVertexLabel(vertices.second) << "\n";
-        std::cout << "BAD! INDEXES: " << vertices.first << " AND " << vertices.second << '\n';
-      }
+
       if (graph[vertices.first][vertices.second] || graph[vertices.second][vertices.first]) {
-        std::cout << "BAD 2\n";
+        std::cout << "BAD!\n";
       }
       
       graph.joinVertices(vertices.first, vertices.second);
