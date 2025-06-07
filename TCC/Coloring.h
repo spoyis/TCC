@@ -101,7 +101,7 @@ namespace Coloring {// begin namespace Coloring
             std::cout << "[CHECKER][TIMESLOT][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_PIGEONHOLE] << '\n';
             std::cout << "[CHECKER][TIMESLOT][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_COLORING] << '\n';
             std::cout << "[CHECKER][ROOM][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE] << '\n';
-            std::cout << "[CHECKER][ROOM][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_ROOM_COLORING] << '\n';
+            std::cout << "[CHECKER][ROOM][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_ROOM_COLORING] << std::endl;
           }
           else step++;
 
@@ -250,7 +250,6 @@ namespace Coloring {// begin namespace Coloring
       Heuristic::strategy<edge, vertex> heuristic,
       Heuristic::eval<edge> eval,
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator>& searchQueue) {
-
       auto clique = (*_graph).findCliqueRandom();
       auto cliqueValidation = Validator::clique<edge, vertex>(clique, *_graph, _checkerPtr->roomData);
       if (cliqueValidation != Validator::VALID) {

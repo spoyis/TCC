@@ -11,6 +11,15 @@ public:
       target(firstPartitionSize + secondPartitionSize + 1),
       visited(firstPartitionSize + secondPartitionSize + 2, 0)
   {
+    // Explicitly default-initialize all edges
+    long vertexCount = firstPartitionSize + secondPartitionSize + 2;
+    for (long u = 0; u < vertexCount; u++) {
+      for (long v = 0; v < vertexCount; v++) {
+        flowGraph[u][v] = FordFulkersonEdge(); // Calls default ctor, sets capacity & flow to invalid_flow_edge
+      }
+    }
+
+    // Then set edges from second partition vertices to target
     for (long i = firstPartitionSize + 1; i < target; i++) {
       flowGraph[i][target] = FordFulkersonEdge(1,0);
       flowGraph[target][i] = FordFulkersonEdge(0,0);
@@ -43,6 +52,9 @@ private:
     long capacity{invalid_flow_edge };
     long flow{ invalid_flow_edge };
 
+    FordFulkersonEdge(long cap = invalid_flow_edge, long flw = invalid_flow_edge)
+      : capacity(cap), flow(flw) {}
+
     long remainingCapacity() {
       return capacity - flow;
     }
@@ -62,13 +74,13 @@ private:
     for (long i = 1; i <= target; i++) {
       if (i == vertex || visited[i] == visitIndex) continue;
       FordFulkersonEdge& outgoingEdge = flowGraph[vertex][i];
-
-      if (outgoingEdge.capacity != invalid_flow_edge && outgoingEdge.remainingCapacity() && dfs(i)) {
-        augment(vertex, i);
-        return 1;
+      if (outgoingEdge.capacity != invalid_flow_edge && outgoingEdge.remainingCapacity()) {
+        if (dfs(i)) {
+          augment(vertex, i);
+          return 1;
+        }
       }
     }
-
     return 0;
   }
 
