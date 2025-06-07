@@ -11,7 +11,7 @@ int main() {
   TestSuite::run<int>("int");
   TestSuite::run<bool>("boolean");
   TestSuite::run<float>("float");
-  //TestSuite::runChecker();
+  TestSuite::runChecker();
   
   
  // try {
@@ -33,7 +33,8 @@ int main() {
 
     std::cout << "PROBLEM CHECKER BEGIN PROCESSING\n";
     auto checker = parser.getChecker();
-    //checker.setStrategy(Coloring::Heuristic::STRATEGY_LOWEST_DEGREE);
+    // checker.setStrategy(Coloring::Heuristic::STRATEGY_LOWEST_DEGREE);
+    checker.setStrategy(Coloring::Heuristic::STRATEGY_RANDOM_FROM_CLIQUE);
     checker.setOptimizationStrategy(Coloring::ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS, true);
     auto result = checker.run();
     std::cout << "PROBLEM CHECKER FINISHED PROCESSING --- MIN COLORING VALUE IS " << result << "\n";

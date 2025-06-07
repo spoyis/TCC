@@ -117,7 +117,23 @@ public:
 	}
 
 	auto getVertexCount() { return _vertexCount; };
+
 	std::string getVertexLabel(int index) { return (*_vertexLabels)[index]; }
+
+	long getEdgeCount(){
+		long output = 0;
+		for (long i = 0; i < _vertexCount; i++) {
+			auto rootI = this->getRoot(i);
+			if (rootI != i) continue;
+			for (long j = 0; j < _vertexCount; j++) {
+				auto rootJ = this->getRoot(j);
+				if (rootJ != j || rootJ == rootI) continue;
+				if (this->operator[](rootI)[rootJ]) output++;
+			}
+		}
+
+		return output;
+	}
 
 	void setVertexLabel(std::string label, int index) {
 		(*_vertexLabels)[index] = label;
@@ -156,30 +172,60 @@ public:
 
 	}
 
-	clique_t findCliqueRandom() {
-		
-		std::uniform_int_distribution<> distrib(0, _vertexCount - 1);
-		int randomNumber = this->getRoot(distrib(gen));
+	clique_t findCliqueRandom(const clique_t& initialClique = {}) {
+		clique_t clique;
 
-		clique_t clique{ randomNumber };
-		
-		for (long i = 0; i < _vertexCount; i++) {
-			bool flag = true;
-			auto rootI = this->getRoot(i);
-			if (rootI < i) continue;
-			for (long j = 0; j < clique.size(); j++) {
-				int cliqueVertex = clique[j];
-				if (cliqueVertex == rootI || !this->operator[](rootI)[cliqueVertex]) {
-					flag = false;
-					break;
-				}
-			}
-
-			if (flag) {
-				clique.push_back(rootI);
-			}
+		if (initialClique.empty()) {
+			// Create initial clique with random vertex if none provided
+			std::uniform_int_distribution<> distrib(0, _vertexCount - 1);
+			int randomNumber = this->getRoot(distrib(gen));
+			clique = { randomNumber };
 		}
-		return clique;
+		else {
+			// Use provided initial clique
+			clique = initialClique;
+		}
+
+    
+    // Create candidates array with all vertices
+    std::vector<long> candidates(_vertexCount);
+    for (long i = 0; i < _vertexCount; i++) {
+        candidates[i] = i;
+    }
+    
+    long n = _vertexCount;
+    while (n > 0) {
+        std::uniform_int_distribution<long> dist(0, n - 1);
+        long idx = dist(gen);
+        auto rootI = this->getRoot(candidates[idx]);
+        
+        // Skip if not a root vertex
+        if (rootI != candidates[idx]) {
+            std::swap(candidates[idx], candidates[n - 1]);
+            --n;
+            continue;
+        }
+        
+        // Check if this vertex can be added to the clique
+        bool flag = true;
+        for (long j = 0; j < clique.size(); j++) {
+            int cliqueVertex = clique[j];
+            if (cliqueVertex == rootI || !this->operator[](rootI)[cliqueVertex]) {
+                flag = false;
+                break;
+            }
+        }
+        
+        if (flag) {
+            clique.push_back(rootI);
+        }
+        
+        // Remove this candidate from consideration
+        std::swap(candidates[idx], candidates[n - 1]);
+        --n;
+    }
+    
+    return clique;
 	}
 
 

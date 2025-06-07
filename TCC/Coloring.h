@@ -72,56 +72,57 @@ namespace Coloring {// begin namespace Coloring
       if (isEnabled(ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS)) {
         sameTimeDifferentRoomsOptimization();
       }
-
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator> searchQueue;
-
       // Create root Zykov
       Zykov* root = new Zykov(_originalGraph->cloneHeap(), _initialVertexCount, this);
       searchQueue.push(root);
       long long step = 0;
+      const int BATCH_SIZE = 10;
+
       while (!searchQueue.empty()) {
-        Zykov* current = searchQueue.top();
-        searchQueue.pop();
-        if (step % 500 == 0) {
-          std::cout << "[CHECKER] STEP " << step++ << " LOWERBOUND == " << current->getLowerBound() << " UPPERBOUND == " << current->getUpperBound() << '\n';
-          std::cout << "[CHECKER] BESTANSWER: " << _bestAnswer << "\n";
-          std::cout << "[CHECKER] NODE STATS:\n";
-          std::cout << "[CHECKER][VALID NODES]: " << processedNodeStatistics[Validator::VALID] << '\n';
-          std::cout << "[CHECKER][TIMESLOT][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_PIGEONHOLE] << '\n';
-          std::cout << "[CHECKER][TIMESLOT][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_COLORING] << '\n';
-          std::cout << "[CHECKER][ROOM][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE] << '\n';
-          std::cout << "[CHECKER][ROOM][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_ROOM_COLORING] << '\n';
-        }
-        else step++;
-       
-        nodesExplored++;
+        // Extract batch of nodes (up to BATCH_SIZE)
+        std::vector<Zykov*> batch;
+        int batchCount = std::min(BATCH_SIZE, static_cast<int>(searchQueue.size()));
 
-        // Pruning: if this node's bound is > current best, skip it
-        if (current->getUpperBound() > _bestAnswer) {
-          nodesPruned++;
-          delete current;
-          continue;
+        for (int i = 0; i < batchCount; i++) {
+          batch.push_back(searchQueue.top());
+          searchQueue.pop();
         }
 
-        // Process current node
-        auto result = current->processNode(getStrategy(), getEval(), searchQueue);
-        if(result == Validator::VALID){
-          auto upperBound = current->getUpperBound();
-          if (current->getLowerBound() == current->getUpperBound()) {
-            _bestAnswer = std::min(_bestAnswer, current->getUpperBound());
+        // Process each node in the batch
+        for (Zykov* current : batch) {
+          if (step % 100 == 0) {
+            std::cout << "[CHECKER] STEP " << step++ << " LOWERBOUND == " << current->getLowerBound() << " UPPERBOUND == " << current->getUpperBound() << '\n';
+            std::cout << "[CHECKER] DENSITY " << current->getGraphDensity() << '\n';
+            std::cout << "[CHECKER] DEPTH " << current->getNodeDepth() << '\n';
+            std::cout << "[CHECKER] BESTANSWER: " << _bestAnswer << "\n";
+            std::cout << "[CHECKER] NODE STATS:\n";
+            std::cout << "[CHECKER][VALID NODES]: " << processedNodeStatistics[Validator::VALID] << '\n';
+            std::cout << "[CHECKER][TIMESLOT][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_PIGEONHOLE] << '\n';
+            std::cout << "[CHECKER][TIMESLOT][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_COLORING] << '\n';
+            std::cout << "[CHECKER][ROOM][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE] << '\n';
+            std::cout << "[CHECKER][ROOM][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_ROOM_COLORING] << '\n';
           }
+          else step++;
+
+          nodesExplored++;
+          // Pruning: if this node's bound is > current best, skip it
+          if (current->getLowerBound() >= _bestAnswer){
+            nodesPruned++;
+            delete current;
+            continue;
+          }
+          // Process current node
+          auto result = current->processNode(getStrategy(), getEval(), searchQueue);
+          processedNodeStatistics[result]++;
+          delete current;
         }
-        processedNodeStatistics[result]++;
-
-        delete current;
       }
-
       // Clean up any remaining nodes in queue
       while (!searchQueue.empty()) {
         delete searchQueue.top();
         searchQueue.pop();
       }
-
       return _bestAnswer;
     }
 
@@ -158,6 +159,9 @@ namespace Coloring {// begin namespace Coloring
       
       case Heuristic::STRATEGY_LOWEST_DEGREE:
         return &Heuristic::lowestDegree<edge, vertex>;
+
+      case Heuristic::STRATEGY_RANDOM_FROM_CLIQUE:
+        return &Heuristic::randomFromClique<edge, vertex>;
       }
     }
 
@@ -214,12 +218,16 @@ namespace Coloring {// begin namespace Coloring
     PruneMotive pruneMotive{ not_pruned };
     double _upperBound;
     double _lowerBound{ 0 };
-
+    double _graphDensity;
+    long _depth{ 0 };
+    std::string _lastOperation{ "none" }; // debug helper!
   public:
 
     // for branch and bound comparison.
     bool operator>(const Zykov& other) const {
-      return (this->getUpperBound() - this->getLowerBound()) > (other.getUpperBound() - other.getLowerBound());
+     // return this->_currentVertexCount > other.ge
+      return this->getGraphDensity() < other.getGraphDensity();
+      //return (this->getUpperBound() - this->getLowerBound()) > (other.getUpperBound() - other.getLowerBound());
     }
 
     Zykov(Graph<edge,vertex>* graph, int size, Checker* ptr) {
@@ -232,6 +240,8 @@ namespace Coloring {// begin namespace Coloring
 
     long getLowerBound() const { return _lowerBound;}
     long getUpperBound() const { return _upperBound;}
+    double getGraphDensity() const { return _graphDensity; }
+    long getNodeDepth() const { return _depth; }
 
     ~Zykov() { delete _graph; }
 
@@ -255,7 +265,11 @@ namespace Coloring {// begin namespace Coloring
       if (nonNeighboringVertices.first == -1) {
         if (_graph->isUndirectedComplete()) {
           std::cout << "GRAFO COMPLETO\n";
-          return _currentVertexCount;
+          if (clique.size() < _checkerPtr->_bestAnswer)
+            _checkerPtr->_bestAnswer = clique.size();
+        }
+        else {
+          std::cout << "[ERROR] THIS ISN'T SUPPOSED TO HAPPEN EVER!!!\n";
         }
         return Validator::VALID;
       }
@@ -263,15 +277,28 @@ namespace Coloring {// begin namespace Coloring
       //std::cout << "FOUND " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
       // Child 1: Add edge
       Zykov* addEdgeChild = new Zykov(*_graph, nonNeighboringVertices, edge{ 1 }, this);
-      if (addEdgeChild->getLowerBound() < _bestAnswer) {
-        searchQueue.push(addEdgeChild);
+      auto addEdgeClique = addEdgeChild->_graph->findCliqueRandom({ nonNeighboringVertices.first, nonNeighboringVertices.second });
+      auto addEdgeValidation = Validator::clique<edge, vertex>(addEdgeClique, *addEdgeChild->_graph, _checkerPtr->roomData);
+      if (addEdgeValidation == Validator::VALID) {
+          searchQueue.push(addEdgeChild);
       }
+      else {
+        _checkerPtr->processedNodeStatistics[addEdgeValidation]++;
+      }
+      
 
       if((*_graph).areJoinable(nonNeighboringVertices.first, nonNeighboringVertices.second)){
         // Child 2: Contract vertices  
         Zykov* contractChild = new Zykov(*_graph, nonNeighboringVertices, this);
-        if (contractChild->getLowerBound() < _bestAnswer) {
+        Graph<edge, vertex>& contractGraph = *contractChild->_graph;
+        auto contractClique = contractGraph.findCliqueRandom({ contractGraph.getRoot(nonNeighboringVertices.first) });
+        auto contractValidation = Validator::clique<edge, vertex>(contractClique, *contractChild->_graph, _checkerPtr->roomData);
+
+        if (contractValidation == Validator::VALID) {
           searchQueue.push(contractChild);
+        }
+        else {
+          _checkerPtr->processedNodeStatistics[contractValidation]++;
         }
       }
       
@@ -301,6 +328,11 @@ namespace Coloring {// begin namespace Coloring
         }
       }
       _upperBound = maxDegree + 1; // Degree-based upper bound
+
+      double V = (double)_currentVertexCount;
+      double E = (double)(*_graph).getEdgeCount();
+
+      _graphDensity = E / (V * (V - 1));
       //std::cout << "HIGHEST DEGREE VERTEX IS  " << graph.getVertexLabel(bestVertex) << " WITH " << maxDegree << '\n';
     }
 
@@ -317,8 +349,10 @@ namespace Coloring {// begin namespace Coloring
       _bestAnswer = parent->_bestAnswer;
       _rightmostVertexIndex = parent->_rightmostVertexIndex;
       _lowerBound = parent->_lowerBound;
+      _depth = parent->_depth + 1;
       computeBounds();
      
+      _lastOperation = "added edge between " + std::to_string(vertices.first) + " and " + std::to_string(vertices.second);
     }
 
     // contract vertices constructor
@@ -338,7 +372,10 @@ namespace Coloring {// begin namespace Coloring
       _bestAnswer = parent->_bestAnswer;
       _rightmostVertexIndex = parent->_rightmostVertexIndex;
       _lowerBound = parent->_lowerBound;
+      _depth = parent->_depth + 1;
       computeBounds();
+
+      _lastOperation = "joined " + std::to_string(vertices.first) + " and " + std::to_string(vertices.second);
     }
 
   }; // end class Coloring::Checker::Zykov

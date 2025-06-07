@@ -178,9 +178,6 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
       }
     }
 
-    // since this is a clique, every vertex will have a different room.
-    // every vertex is actually a collection of different classrooms.
-    // inside each vertex, run bipartite matching to make sure each of them can fit within a timeslot.
     return VALID;
   }
 
