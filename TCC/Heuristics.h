@@ -50,9 +50,7 @@ namespace Coloring::Heuristic
     for (int i = 0; i < clique.size(); i++) {
       long root = g.getRoot(clique[i]);
       auto degree = g.getVertexDegree(root);
-      if (degree < vertexCount) {
-        degreeVertexPairs.push_back({ degree, root });
-      }
+      degreeVertexPairs.push_back({ degree, root });
     }
 
     if (degreeVertexPairs.empty()) return { -1, -1 };

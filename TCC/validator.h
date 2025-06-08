@@ -11,7 +11,9 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
     INVALID_TIMESLOT_PIGEONHOLE,
     INVALID_TIMESLOT_COLORING,
     INVALID_ROOM_PIGEONHOLE,
-    INVALID_ROOM_COLORING
+    INVALID_ROOM_COLORING,
+    INVALID_JOINING,
+    MISSING_COLORS,
   };
   
   using clique_t = std::vector<long>;
@@ -179,6 +181,24 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
     }
 
     return VALID;
+  }
+
+
+  // quickly checks if any vertices are missing colors, immediately invalidating the whole instance
+  // this is used only on the root vertex of a Checker instance.
+  template<typename edge, typename vertex>
+  ValidationState naiveCheck(Graph<edge, vertex>& g, std::vector<std::vector<long>> roomData) {
+    ValidationState output = VALID;
+    auto vertexCount = g.getVertexCount();
+
+    for (long i = 0; i < g.getVertexCount(); i++) {
+      if (g.getVertexData(i).size() == 0 || roomData[i].size() == 0) {
+        std::cout << "[VALIDATION][BAD GRAPH] VERTEX " << g.getVertexLabel(i) << " IS MISSING COLORS!\n";
+        output = MISSING_COLORS;
+      }
+    }
+
+    return output;
   }
 
 }// end namespace Coloring::Validator

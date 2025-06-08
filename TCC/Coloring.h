@@ -69,6 +69,7 @@ namespace Coloring {// begin namespace Coloring
     }
 
     int run() {
+      if (Validator::naiveCheck<edge, vertex>(*_originalGraph, roomData) == Validator::MISSING_COLORS) return -1;
       if (isEnabled(ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS)) {
         sameTimeDifferentRoomsOptimization();
       }
@@ -91,13 +92,14 @@ namespace Coloring {// begin namespace Coloring
 
         // Process each node in the batch
         for (Zykov* current : batch) {
-          if (step % 100 == 0) {
+          if (step % 1 == 0) {
             std::cout << "[CHECKER] STEP " << step++ << " LOWERBOUND == " << current->getLowerBound() << " UPPERBOUND == " << current->getUpperBound() << '\n';
             std::cout << "[CHECKER] DENSITY " << current->getGraphDensity() << '\n';
             std::cout << "[CHECKER] DEPTH " << current->getNodeDepth() << '\n';
             std::cout << "[CHECKER] BESTANSWER: " << _bestAnswer << "\n";
-            std::cout << "[CHECKER] NODE STATS:\n";
+            std::cout << "[CHECKER] PRUNED NODE STATS:\n";
             std::cout << "[CHECKER][VALID NODES]: " << processedNodeStatistics[Validator::VALID] << '\n';
+            std::cout << "[CHECKER][TIMESLOT][INVALID_JOINING]:" << processedNodeStatistics[Validator::INVALID_JOINING] << '\n';
             std::cout << "[CHECKER][TIMESLOT][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_PIGEONHOLE] << '\n';
             std::cout << "[CHECKER][TIMESLOT][NO_COLORING]: " << processedNodeStatistics[Validator::INVALID_TIMESLOT_COLORING] << '\n';
             std::cout << "[CHECKER][ROOM][PIGEONHOLE]: " << processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE] << '\n';
@@ -146,7 +148,7 @@ namespace Coloring {// begin namespace Coloring
     Heuristic::Enums eval{ Heuristic::EVAL_DEFAULT };
     std::vector<bool> optimizationStrategies;
     std::vector<std::vector<long>> roomData;
-    std::vector<long> processedNodeStatistics{0,0,0,0,0};
+    std::vector<long> processedNodeStatistics{0,0,0,0,0,0};
 
     // Statistics
     long nodesExplored = 0;
@@ -250,22 +252,35 @@ namespace Coloring {// begin namespace Coloring
       Heuristic::strategy<edge, vertex> heuristic,
       Heuristic::eval<edge> eval,
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator>& searchQueue) {
-      auto clique = (*_graph).findCliqueRandom();
-      auto cliqueValidation = Validator::clique<edge, vertex>(clique, *_graph, _checkerPtr->roomData);
-      if (cliqueValidation != Validator::VALID) {
-        return cliqueValidation;
-      }
-      _lowerBound = std::max(_lowerBound, (double)clique.size());
+      
+      // Validate multiple random cliques for more aggressive pruning
+      const int NUM_CLIQUES_TO_VALIDATE = 10;
+      std::vector<long> largestClique;
 
+      for (int i = 0; i < NUM_CLIQUES_TO_VALIDATE; ++i) {
+        auto clique = (*_graph).findCliqueRandom();
+        auto cliqueValidation = Validator::clique<edge, vertex>(clique, *_graph, _checkerPtr->roomData);
+
+        if (cliqueValidation != Validator::VALID) {
+          // If any clique is invalid, we can prune this node
+          return cliqueValidation;
+        }
+
+        if (clique.size() > largestClique.size()) {
+          largestClique = clique;
+        }
+      }
+
+      _lowerBound = std::max(_lowerBound, (double)largestClique.size());
       // this returns {-1, -1} if no valid vertex pair is found
-      auto nonNeighboringVertices = heuristic(*_graph, eval, clique, _rightmostVertexIndex, _currentVertexCount);
+      auto nonNeighboringVertices = heuristic(*_graph, eval, largestClique, _rightmostVertexIndex, _currentVertexCount);
 
       // If no valid vertex pair found, check if complete
       if (nonNeighboringVertices.first == -1) {
         if (_graph->isUndirectedComplete()) {
           std::cout << "GRAFO COMPLETO\n";
-          if (clique.size() < _checkerPtr->_bestAnswer)
-            _checkerPtr->_bestAnswer = clique.size();
+          if (largestClique.size() < _checkerPtr->_bestAnswer)
+            _checkerPtr->_bestAnswer = largestClique.size();
         }
         else {
           std::cout << "[ERROR] THIS ISN'T SUPPOSED TO HAPPEN EVER!!!\n";
@@ -273,20 +288,21 @@ namespace Coloring {// begin namespace Coloring
         return Validator::VALID;
       }
 
-      //std::cout << "FOUND " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
+      std::cout << "FOUND " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
+
       // Child 1: Add edge
       Zykov* addEdgeChild = new Zykov(*_graph, nonNeighboringVertices, edge{ 1 }, this);
       auto addEdgeClique = addEdgeChild->_graph->findCliqueRandom({ nonNeighboringVertices.first, nonNeighboringVertices.second });
       auto addEdgeValidation = Validator::clique<edge, vertex>(addEdgeClique, *addEdgeChild->_graph, _checkerPtr->roomData);
       if (addEdgeValidation == Validator::VALID) {
-          searchQueue.push(addEdgeChild);
+        searchQueue.push(addEdgeChild);
       }
       else {
         _checkerPtr->processedNodeStatistics[addEdgeValidation]++;
+        delete addEdgeChild;
       }
-      
 
-      if((*_graph).areJoinable(nonNeighboringVertices.first, nonNeighboringVertices.second)){
+      if ((*_graph).areJoinable(nonNeighboringVertices.first, nonNeighboringVertices.second)) {
         // Child 2: Contract vertices  
         Zykov* contractChild = new Zykov(*_graph, nonNeighboringVertices, this);
         Graph<edge, vertex>& contractGraph = *contractChild->_graph;
@@ -298,9 +314,11 @@ namespace Coloring {// begin namespace Coloring
         }
         else {
           _checkerPtr->processedNodeStatistics[contractValidation]++;
+          delete contractChild;
         }
       }
-      
+      else _checkerPtr->processedNodeStatistics[Validator::INVALID_JOINING]++;
+
       return Validator::VALID;
     }
 
