@@ -11,6 +11,7 @@ namespace Coloring {// begin namespace Coloring
 
   enum OptimizationStrategy {
     ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS = 0,
+    VERTICES_WITH_NO_COLOR_INTERSECTION = 1
   };
 
   template<class graph_t>
@@ -29,7 +30,7 @@ namespace Coloring {// begin namespace Coloring
   public:
     Checker(graph_t* graph, std::vector<std::vector<long>>& roomData) 
       : roomData(graph->getVertexCount()),
-        optimizationStrategies( 1, false )
+        optimizationStrategies( 2, false )
     {
       _originalGraph = graph;
       _initialVertexCount = _bestAnswer = _originalGraph->getVertexCount();
@@ -70,6 +71,7 @@ namespace Coloring {// begin namespace Coloring
 
     int run() {
       if (Validator::naiveCheck<edge, vertex>(*_originalGraph, roomData) == Validator::MISSING_COLORS) return -1;
+
       if (isEnabled(ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS)) {
         sameTimeDifferentRoomsOptimization();
       }
@@ -92,7 +94,7 @@ namespace Coloring {// begin namespace Coloring
 
         // Process each node in the batch
         for (Zykov* current : batch) {
-          if (step % 1 == 0) {
+          if (step % 50 == 0) {
             std::cout << "[CHECKER] STEP " << step++ << " LOWERBOUND == " << current->getLowerBound() << " UPPERBOUND == " << current->getUpperBound() << '\n';
             std::cout << "[CHECKER] DENSITY " << current->getGraphDensity() << '\n';
             std::cout << "[CHECKER] DEPTH " << current->getNodeDepth() << '\n';
@@ -107,6 +109,7 @@ namespace Coloring {// begin namespace Coloring
           }
           else step++;
 
+          extraValidationStepCounter++;
           nodesExplored++;
           // Pruning: if this node's bound is > current best, skip it
           if (current->getLowerBound() >= _bestAnswer){
@@ -117,6 +120,12 @@ namespace Coloring {// begin namespace Coloring
           // Process current node
           auto result = current->processNode(getStrategy(), getEval(), searchQueue);
           processedNodeStatistics[result]++;
+
+          if (shouldRunRecursiveCheck(result)) {
+            // create new problem instance
+            // the instance will be a subgraph of the original graph with the failing clique.
+          }
+
           delete current;
         }
       }
@@ -140,13 +149,15 @@ namespace Coloring {// begin namespace Coloring
    
     using edge = typename graph_t::edge_t;
     using vertex = typename graph_t::vertex_t;
-
+    bool _isRootChecker{ true };
+    bool _areRecursiveChecksEnabled{ true };
     long _bestAnswer;
     long _initialVertexCount;
+    long extraValidationStepCounter = { 0 };
     Graph<edge, vertex>* _originalGraph;
     Heuristic::Enums strategy{ Heuristic::STRATEGY_DEFAULT };
     Heuristic::Enums eval{ Heuristic::EVAL_DEFAULT };
-    std::vector<bool> optimizationStrategies;
+    std::vector<bool> optimizationStrategies{false, false};
     std::vector<std::vector<long>> roomData;
     std::vector<long> processedNodeStatistics{0,0,0,0,0,0};
 
@@ -164,6 +175,9 @@ namespace Coloring {// begin namespace Coloring
 
       case Heuristic::STRATEGY_RANDOM_FROM_CLIQUE:
         return &Heuristic::randomFromClique<edge, vertex>;
+
+      case Heuristic::STRATEGY_SHARED_NEIGHTBORS:
+        return &Heuristic::mostSharedNeighbors<edge, vertex>;
       }
     }
 
@@ -178,17 +192,28 @@ namespace Coloring {// begin namespace Coloring
       return optimizationStrategies[givenStrategy];
     }
 
+    bool shouldRunRecursiveCheck(long result) {
+      return result != Validator::VALID && extraValidationStepCounter >= 100 && _isRootChecker;
+    }
+
+    bool shouldZykovNodesSaveBadCliques() {
+      return _areRecursiveChecksEnabled && extraValidationStepCounter >= 100 && _isRootChecker;
+    }
+
     void sameTimeDifferentRoomsOptimization() {
       std::vector<std::pair<long, long>> nonNeighbors;
       Graph<edge, vertex>& graph = *_originalGraph;
 
       for (long i = 0; i < _initialVertexCount; i++)
+      {
         for (long j = 0; j < _initialVertexCount; j++) {
           if (i == j) continue;
           if (roomData[i].size() > 1 || roomData[j].size() > 1) continue;
 
           if (!graph[i][j]) nonNeighbors.push_back({ i,j });
         }
+      }
+
       for (auto& vertexPair : nonNeighbors) {
         auto v1 = vertexPair.first;
         auto v2 = vertexPair.second;
@@ -214,6 +239,7 @@ namespace Coloring {// begin namespace Coloring
     long _currentVertexCount;
     long _rightmostVertexIndex;
     long _bestAnswer;
+    std::vector<long> badClique;
     Graph<edge, vertex>* _graph;
     Checker* _checkerPtr;
     bool _isValidNode{true};
@@ -227,9 +253,9 @@ namespace Coloring {// begin namespace Coloring
 
     // for branch and bound comparison.
     bool operator>(const Zykov& other) const {
-     // return this->_currentVertexCount > other.ge
-      return this->getGraphDensity() < other.getGraphDensity();
-      //return (this->getUpperBound() - this->getLowerBound()) > (other.getUpperBound() - other.getLowerBound());
+      //return this->_currentVertexCount > other._currentVertexCount; // vertex count
+      return this->getGraphDensity() < other.getGraphDensity();   // density
+      //return (this->getUpperBound() - this->getLowerBound()) > (other.getUpperBound() - other.getLowerBound()); // bound differential.
     }
 
     Zykov(Graph<edge,vertex>* graph, int size, Checker* ptr) {
@@ -237,7 +263,7 @@ namespace Coloring {// begin namespace Coloring
       _currentVertexCount = _bestAnswer = size;
       _rightmostVertexIndex = size - 1;
       _checkerPtr = ptr;
-      computeBounds();
+      computeBounds(ptr->isEnabled(VERTICES_WITH_NO_COLOR_INTERSECTION));
     }
 
     long getLowerBound() const { return _lowerBound;}
@@ -254,15 +280,17 @@ namespace Coloring {// begin namespace Coloring
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator>& searchQueue) {
       
       // Validate multiple random cliques for more aggressive pruning
-      const int NUM_CLIQUES_TO_VALIDATE = 10;
+      const int NUM_CLIQUES_TO_VALIDATE = 5;
       std::vector<long> largestClique;
+      bool saveBadCliques = _checkerPtr->shouldZykovNodesSaveBadCliques();
 
       for (int i = 0; i < NUM_CLIQUES_TO_VALIDATE; ++i) {
-        auto clique = (*_graph).findCliqueRandom();
+        auto clique = (*_graph).findCliqueGrasp();
         auto cliqueValidation = Validator::clique<edge, vertex>(clique, *_graph, _checkerPtr->roomData);
 
         if (cliqueValidation != Validator::VALID) {
           // If any clique is invalid, we can prune this node
+          if(saveBadCliques)
           return cliqueValidation;
         }
 
@@ -272,9 +300,10 @@ namespace Coloring {// begin namespace Coloring
       }
 
       _lowerBound = std::max(_lowerBound, (double)largestClique.size());
+      
       // this returns {-1, -1} if no valid vertex pair is found
       auto nonNeighboringVertices = heuristic(*_graph, eval, largestClique, _rightmostVertexIndex, _currentVertexCount);
-
+      //std::cout << "SELECTED " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
       // If no valid vertex pair found, check if complete
       if (nonNeighboringVertices.first == -1) {
         if (_graph->isUndirectedComplete()) {
@@ -288,7 +317,7 @@ namespace Coloring {// begin namespace Coloring
         return Validator::VALID;
       }
 
-      std::cout << "FOUND " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
+      //std::cout << "FOUND " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
 
       // Child 1: Add edge
       Zykov* addEdgeChild = new Zykov(*_graph, nonNeighboringVertices, edge{ 1 }, this);
@@ -324,7 +353,8 @@ namespace Coloring {// begin namespace Coloring
 
   private:
 
-    void computeBounds() {
+    void computeBounds(bool searchForNonJoinableVertices = false) {
+      std::vector<std::pair<long, long>> nonNeighbors;
       Graph<edge, vertex>& graph = *_graph;
       long maxDegree = 0;
       long vertexCount = graph.getVertexCount();
@@ -337,7 +367,9 @@ namespace Coloring {// begin namespace Coloring
         for (long j = 0; j < vertexCount; j++) {
           long rootJ = graph.getRoot(j);
           if (rootJ < j) continue;
-          if (i != j && graph[rootI][j]) degree++;
+          if (i != j && graph[rootI][rootJ]) degree++;
+          else if (i != j && !graph[rootI][rootJ] && searchForNonJoinableVertices)
+            nonNeighbors.push_back({ i,j });
         }
         if (degree > maxDegree) {
           maxDegree = degree;
@@ -346,11 +378,30 @@ namespace Coloring {// begin namespace Coloring
       }
       _upperBound = maxDegree + 1; // Degree-based upper bound
 
+      // SET GRAPHDENSITY
       double V = (double)_currentVertexCount;
       double E = (double)(*_graph).getEdgeCount();
 
       _graphDensity = E / (V * (V - 1));
-      //std::cout << "HIGHEST DEGREE VERTEX IS  " << graph.getVertexLabel(bestVertex) << " WITH " << maxDegree << '\n';
+
+
+      if (searchForNonJoinableVertices) {
+        long optimizationCounter = 0;
+        for (auto& vertexPair : nonNeighbors) {
+          auto v1 = vertexPair.first;
+          auto v2 = vertexPair.second;
+
+          // if can't be joined, place an edge.
+          if (!graph.areJoinable(v1, v2)) {
+            graph[v1][v2] = { 1 };
+            graph[v2][v1] = { 1 };
+
+            optimizationCounter++;
+          }
+        }
+        if(optimizationCounter != 0)
+        std::cout << "[OPTIMIZATION][NON_JOINABLE] OPTIMIZED " << optimizationCounter << " EDGES!\n";
+      }
     }
 
     // add edge constructor

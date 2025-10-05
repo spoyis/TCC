@@ -38,7 +38,7 @@ public:
 	}
 
 	// Move assignment operator
-	Graph& operator=(const Graph&& other) {
+	Graph& operator=(Graph&& other) {
 		delete this->adjMatrix;
 		delete this->_vertexVal;
 
@@ -146,6 +146,7 @@ public:
 	void joinVertices(int index1, int index2) {
 		int root1 = _vertexVal->findRoot(index1);
 		int root2 = _vertexVal->findRoot(index2);
+		//if (root1 == root2) std::cout << "you're trying to join a vertex thats already been joined, you sure?\n";
 
 		_vertexVal->unionOp(root1, root2);
 		joinEdgeData(std::min(index1, index2), std::max(index1, index2));
@@ -171,6 +172,107 @@ public:
 	long findCliqueGreedy() {
 
 	}
+
+	clique_t findCliqueGrasp(const clique_t& initialClique = {}, int maxIterations = 5) {
+	clique_t bestClique;
+
+	for (int iter = 0; iter < maxIterations; iter++) {
+		clique_t clique;
+
+		if (initialClique.empty()) {
+			std::uniform_int_distribution<> distrib(0, _vertexCount - 1);
+			int current = getRoot(distrib(gen));
+			clique.push_back(current);
+		} else {
+			clique = initialClique;
+		}
+
+		// Candidate set = all other vertices
+		std::vector<int> candidates;
+		for (int i = 0; i < _vertexCount; i++) {
+			int root = getRoot(i);
+			if (std::find(clique.begin(), clique.end(), i) == clique.end() && root == i) {
+				candidates.push_back(i);
+			}
+		}
+
+		while (!candidates.empty()) {
+			// Build restricted candidate list (RCL)
+			struct CandidateScore {
+				int v;
+				int score;
+			};
+			std::vector<CandidateScore> scored;
+
+			for (int v : candidates) {
+				// Check if v is adjacent to all current clique members
+				bool isNeighbor = true;
+				for (int c : clique) {
+					if (!this->operator[](v)[c]) {
+						isNeighbor = false;
+						break;
+					}
+				}
+				if (!isNeighbor) continue;
+
+				// Heuristic: degree of v
+				int degree = 0;
+				for (int k = 0; k < _vertexCount; k++) {
+					int rootK = getRoot(k);
+					if (rootK != k)continue;
+					if (rootK != v && this->operator[](v)[rootK]) {
+						degree++;
+					}
+				}
+
+				scored.push_back({ v, degree });
+			}
+
+			if (scored.empty()) break;
+
+			// Find max score
+			int maxScore = -1;
+			for (auto& s : scored) {
+				if (s.score > maxScore) maxScore = s.score;
+			}
+
+			// RCL: (top scorers within 80% of max)
+			std::vector<int> rcl;
+			for (auto& s : scored) {
+				if (s.score >= (maxScore * 0.8)) {
+					rcl.push_back(s.v);
+				}
+			}
+
+			// Pick random from RCL
+			std::uniform_int_distribution<> d(0, (int)rcl.size() - 1);
+			int chosen = rcl[d(gen)];
+			clique.push_back(chosen);
+
+			// Update candidates: keep only vertices adjacent to all in clique
+			std::vector<int> newCandidates;
+			for (int v : candidates) {
+				if (v == chosen) continue;
+				bool ok = true;
+				for (int c : clique) {
+					if (!this->operator[](v)[c]) {
+						ok = false;
+						break;
+					}
+				}
+				if (ok) newCandidates.push_back(v);
+			}
+			candidates.swap(newCandidates);
+		}
+
+		if (clique.size() > bestClique.size()) {
+			bestClique = clique;
+		}
+	}
+
+	return bestClique;
+}
+
 
 	clique_t findCliqueRandom(const clique_t& initialClique = {}) {
 		clique_t clique;
@@ -254,14 +356,14 @@ public:
 	void joinVertexData(int index1, int index2) {
 		UnionFind<vertex>& unionfind = *_vertexVal;
 		vertex& v1 = unionfind[index1];
-		vertex& v2 = unionfind[index1];
+		vertex& v2 = unionfind[index2];
 
 		joinVertexDataHelper<vertex>(v1, v2);
 	}
 	// -- Template method for any std::vector, calculates intersection.
 	template <class Vector>
 	typename std::enable_if<is_specialization<Vector, std::vector>::value>::type
-	joinVertexDataHelper(Vector v1, const Vector v2) {
+	joinVertexDataHelper(Vector& v1, const Vector& v2) {
 		auto right = v1.size();
 		long left = 0;
 
