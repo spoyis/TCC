@@ -307,13 +307,18 @@ namespace Coloring {// begin namespace Coloring
 
       bool reduced = true;
       long reductionCounter = 0;
+
+      // Aggressively test all subcliques
       while (reduced && badClique.size() > 1) {
         reduced = false;
+
+        // Generate all subcliques of size (current size - 1)
         for (long i = 0; i < badClique.size(); ++i) {
           std::vector<long> subClique;
           for (long j = 0; j < badClique.size(); ++j) {
             if (j != i) subClique.push_back(badClique[j]);
           }
+
           auto validation = Validator::clique(subClique, badGraph, roomData);
           if (validation != Validator::VALID) {
             badClique = subClique;
@@ -323,7 +328,9 @@ namespace Coloring {// begin namespace Coloring
           }
         }
       }
-      std::cout << "[CLEANUP] REDUCED BAD CLIQUE BY  " << reductionCounter << '\n' << "[CLEANUP] BAD CLIQUE SIZE IS " << badClique.size() << '\n';
+
+      std::cout << "[CLEANUP] REDUCED BAD CLIQUE BY  " << reductionCounter
+        << '\n' << "[CLEANUP] BAD CLIQUE SIZE IS " << badClique.size() << '\n';
 
       std::vector<long> badVertices = badNode->getJoinedVerticesFromClique(badClique);
 
@@ -333,14 +340,13 @@ namespace Coloring {// begin namespace Coloring
         searchQueue.pop();
       }
 
-      std::vector<Zykov*>duplicateQueue;
+      std::vector<Zykov*> duplicateQueue;
 
       for (Zykov* currentNode : extractQueue) {
-
         Graph<edge, vertex>& currentGraph = *currentNode->getGraph();
         bool sameClique = true;
 
-        // 1. Check that all roots in badClique are still roots in this node
+        // 1. All roots of badClique must be roots in this node
         for (auto rootVertex : badClique) {
           if (currentGraph.getRoot(rootVertex) != rootVertex) {
             sameClique = false;
@@ -353,9 +359,8 @@ namespace Coloring {// begin namespace Coloring
           continue;
         }
 
-        // check 2: all non-root vertices in badVertices have same root in both
+        // 2. Non-root vertices must have the same root in both graphs
         for (long v : badVertices) {
-          
           long rBad = badGraph.getRoot(v);
           long rCur = currentGraph.getRoot(v);
           if (rBad != rCur) {
@@ -369,7 +374,7 @@ namespace Coloring {// begin namespace Coloring
           continue;
         }
 
-        // check 3: the vertices in badVertices form the same clique in current
+        // 3. All vertices in badVertices must form the same clique
         for (long i = 0; i < badVertices.size() && sameClique; ++i) {
           for (long j = i + 1; j < badVertices.size(); ++j) {
             long a = badVertices[i];
@@ -382,16 +387,16 @@ namespace Coloring {// begin namespace Coloring
         }
 
         if (!sameClique) {
-          duplicateQueue.push_back(currentNode); // keep it — it’s different
+          duplicateQueue.push_back(currentNode); // keep node — clique is different
         }
-        else // if sameClique == true, skip reinsertion, clique is invalid.
-          delete currentNode; 
+        else {
+          delete currentNode; // remove node — clique duplicates bad clique
+        }
       }
 
       for (Zykov* node : duplicateQueue) {
         searchQueue.push(node);
       }
-
 
       std::cout << "[CLEANUP] Removed "
         << (extractQueue.size() - duplicateQueue.size())
