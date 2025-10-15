@@ -4,6 +4,7 @@
 #include "BipartiteMatching.h"
 #include <queue>
 #include "validator.h"
+#include <stdexcept>
 
 long globalCounter = 0;
 
@@ -83,6 +84,9 @@ namespace Coloring {// begin namespace Coloring
       const int BATCH_SIZE = 10;
 
       while (!searchQueue.empty()) {
+        if (hasSolution) {
+          break;
+        }
         // Extract batch of nodes (up to BATCH_SIZE)
         std::vector<Zykov*> batch;
         int batchCount = std::min(BATCH_SIZE, static_cast<int>(searchQueue.size()));
@@ -94,7 +98,7 @@ namespace Coloring {// begin namespace Coloring
 
         // Process each node in the batch
         for (Zykov* current : batch) {
-          if (step % 50 == 0) {
+          if (step % 50 == 0 && _isRootChecker) {
             std::cout << "[CHECKER] STEP " << step++ << " LOWERBOUND == " << current->getLowerBound() << " UPPERBOUND == " << current->getUpperBound() << '\n';
             std::cout << "[CHECKER] DENSITY " << current->getGraphDensity() << '\n';
             std::cout << "[CHECKER] DEPTH " << current->getNodeDepth() << '\n';
@@ -109,6 +113,11 @@ namespace Coloring {// begin namespace Coloring
           }
           else step++;
 
+          if (!_isRootChecker && step % 100 == 0) {
+            std::cout << "[AUXILIARY CHECK] STEP: " << step << '\n';
+          }
+          
+
           extraValidationStepCounter++;
           nodesExplored++;
           // Pruning: if this node's bound is > current best, skip it
@@ -121,9 +130,30 @@ namespace Coloring {// begin namespace Coloring
           auto result = current->processNode(getStrategy(), getEval(), searchQueue);
           processedNodeStatistics[result]++;
 
-          if (shouldRunRecursiveCheck(result)) {
+          if (shouldRunRecursiveCheck(result) && false) {
             // create new problem instance
             // the instance will be a subgraph of the original graph with the failing clique.
+            Checker<graph_t> recursiveChecker = createRecursiveInstance(current);
+            recursiveChecker.setStrategy(this->strategy);
+            for (long i = 0; i < optimizationStrategies.size(); i++) {
+              recursiveChecker.setOptimizationStrategy(static_cast<OptimizationStrategy>(i), optimizationStrategies[i]);
+            }
+            recursiveChecker.setRecursiveInstanceFlag();
+            auto recursiveResult = recursiveChecker.run();
+            if (!recursiveChecker.hasSolution ) {
+              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "HOLY SHIT!!!!\n";
+              break;
+            }
+            std::cout << "RECURSION RESULTED IN " << recursiveResult << '\n';
+            extraValidationStepCounter = 0;
           }
 
           delete current;
@@ -154,6 +184,7 @@ namespace Coloring {// begin namespace Coloring
     long _bestAnswer;
     long _initialVertexCount;
     long extraValidationStepCounter = { 0 };
+    bool hasSolution{ false };
     Graph<edge, vertex>* _originalGraph;
     Heuristic::Enums strategy{ Heuristic::STRATEGY_DEFAULT };
     Heuristic::Enums eval{ Heuristic::EVAL_DEFAULT };
@@ -228,6 +259,38 @@ namespace Coloring {// begin namespace Coloring
       }
     }
 
+    Checker<graph_t> createRecursiveInstance(Zykov* node) {
+      std::vector<long> vertices = node->getJoinedVerticesFromClique(node->getBadClique());
+
+      std::vector<std::vector<long>>* _newRoomData = new std::vector<std::vector<long>>(vertices.size());
+      Graph<edge, vertex>* _newGraph = new Graph<edge,vertex>(vertices.size());
+      Graph<edge, vertex>& newGraph = *_newGraph;
+      Graph<edge, vertex>& originalGraph = *_originalGraph;
+
+      for (long i = 0; i < vertices.size(); ++i) {
+        long oldI = vertices[i];
+        //set vertex data (timeslots)
+        auto vertexData = originalGraph.getVertexData(oldI);
+        newGraph.setVertexData(i, vertexData);
+        // set room data
+        (*_newRoomData)[i] = roomData[oldI];
+        // set labels
+        newGraph.setVertexLabel(node->getVertexLabel(oldI), i);
+
+        // copy adjacency
+        for (long j = 0; j < vertices.size(); ++j) {
+          long oldJ = vertices[j];
+          newGraph[i][j] = originalGraph[oldI][oldJ];
+        }
+      }
+
+      return Checker<graph_t>(_newGraph, *_newRoomData);
+    }
+
+    void setRecursiveInstanceFlag() {
+      _isRootChecker = false;
+    }
+
   }; // end class Coloring::Checker
 
 
@@ -268,10 +331,69 @@ namespace Coloring {// begin namespace Coloring
 
     long getLowerBound() const { return _lowerBound;}
     long getUpperBound() const { return _upperBound;}
+    std::vector<long> getBadClique() { if (badClique.size() == 0) std::cout << "[THIS SHOULDNT HAPPEN] asked for an empty \"bad\" clique ?!\n"; return badClique; }
     double getGraphDensity() const { return _graphDensity; }
     long getNodeDepth() const { return _depth; }
+    std::string getVertexLabel(long index) const { return _graph->getVertexLabel(index); }
+
+    std::vector<long> getJoinedVerticesFromClique(const  std::vector<long>& clique) {
+      std::vector<long> output(clique);
+      // all vertices in clique are in the original graph, we need to find the ones we "missed" when we joined them.
+      Graph<edge, vertex>& graph = *_graph;
+
+      for (auto& v : clique) {
+        if (graph.getRoot(v) != v) {
+          throw std::logic_error("Clique contains a non-root vertex");
+        }
+        for (long i = 0; i < _graph->getVertexCount(); i++) {
+          auto root = graph.getRoot(i);
+          if (root != i && root == v) {
+            output.push_back(i);
+          }
+        }
+      }
+
+      return output;
+    }
 
     ~Zykov() { delete _graph; }
+
+    void edgeAdditionOptimization(const std::vector<long>& clique) {
+      Graph<edge, vertex>& graph = *_graph;
+      long n = graph.getVertexCount();
+      int edgesAdded = 0;
+
+      // Iterate over all pairs of vertices outside the clique
+      for (long x = 0; x < n; ++x) {
+        auto rootX = graph.getRoot(x);
+        if (std::find(clique.begin(), clique.end(), rootX) != clique.end()) continue; // skip if in clique
+        if (rootX != x) continue; // skip if not a root
+
+        for (long y = x + 1; y < n; ++y) {
+          auto rootY = graph.getRoot(y);
+          if (std::find(clique.begin(), clique.end(), rootY) != clique.end()) continue;
+          if (rootY != y) continue; // skip if not a root
+          if (graph[x][y]) continue; // skip existing edges
+
+          // Check if every vertex in clique is adjacent to at least one of x or y
+          bool allCovered = true;
+          for (auto z : clique) {
+            if (!graph[x][z] && !graph[y][z]) {
+              allCovered = false;
+              break;
+            }
+          }
+
+          if (allCovered) {
+            graph[x][y] = edge{ 1 };
+            graph[y][x] = edge{ 1 };
+            edgesAdded++;
+          }
+        }
+      }
+
+      
+    }
 
     
     long processNode(
@@ -290,16 +412,19 @@ namespace Coloring {// begin namespace Coloring
 
         if (cliqueValidation != Validator::VALID) {
           // If any clique is invalid, we can prune this node
-          if(saveBadCliques)
+          if (saveBadCliques) {
+            badClique = clique;
+          }
           return cliqueValidation;
         }
-
+        
         if (clique.size() > largestClique.size()) {
           largestClique = clique;
         }
       }
-
       _lowerBound = std::max(_lowerBound, (double)largestClique.size());
+      edgeAdditionOptimization(largestClique);
+      
       
       // this returns {-1, -1} if no valid vertex pair is found
       auto nonNeighboringVertices = heuristic(*_graph, eval, largestClique, _rightmostVertexIndex, _currentVertexCount);
@@ -307,6 +432,7 @@ namespace Coloring {// begin namespace Coloring
       // If no valid vertex pair found, check if complete
       if (nonNeighboringVertices.first == -1) {
         if (_graph->isUndirectedComplete()) {
+          _checkerPtr->hasSolution = true;
           std::cout << "GRAFO COMPLETO\n";
           if (largestClique.size() < _checkerPtr->_bestAnswer)
             _checkerPtr->_bestAnswer = largestClique.size();
