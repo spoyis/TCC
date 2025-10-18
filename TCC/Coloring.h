@@ -290,7 +290,7 @@ namespace Coloring {// begin namespace Coloring
         // copy adjacency
         for (long j = 0; j < vertices.size(); ++j) {
           long oldJ = vertices[j];
-          newGraph[i][j] = originalGraph[oldI][oldJ];
+          newGraph[i][j] = originalGraph.at(oldI, oldJ);
         }
       }
 
@@ -369,11 +369,11 @@ namespace Coloring {// begin namespace Coloring
           continue;
         }
 
-        // check 3: the vertices in badVertices form the same clique in current
-        for (long i = 0; i < badVertices.size() && sameClique; ++i) {
-          for (long j = i + 1; j < badVertices.size(); ++j) {
-            long a = badVertices[i];
-            long b = badVertices[j];
+        // check 3: the roots in badClique form the same clique in current
+        for (long i = 0; i < badClique.size() && sameClique; ++i) {
+          for (long j = i + 1; j < badClique.size(); ++j) {
+            long a = badClique[i];
+            long b = badClique[j];
             if (!currentGraph[a][b]) {
               sameClique = false;
               break;
@@ -424,8 +424,8 @@ namespace Coloring {// begin namespace Coloring
     // for branch and bound comparison.
     bool operator>(const Zykov& other) const {
       //return this->_currentVertexCount > other._currentVertexCount; // vertex count
-      return this->getGraphDensity() < other.getGraphDensity();   // density
-      //return (this->getUpperBound() - this->getLowerBound()) > (other.getUpperBound() - other.getLowerBound()); // bound differential.
+      //return this->getGraphDensity() < other.getGraphDensity();   // density
+      return (this->getUpperBound() - this->getLowerBound()) > (other.getUpperBound() - other.getLowerBound()); // bound differential.
     }
 
     Zykov(Graph<edge,vertex>* graph, int size, Checker* ptr) {
@@ -663,7 +663,11 @@ namespace Coloring {// begin namespace Coloring
       auto& roomData = parent->_checkerPtr->roomData;
 
       if (graph[vertices.first][vertices.second] || graph[vertices.second][vertices.first]) {
-        std::cout << "BAD!\n";
+        std::cout << "BAD CONTRACTION!!!!! VERTICES ARE NEIGHBORS\n";
+      }
+
+      if (graph.getRoot(vertices.first) != graph.getRoot(vertices.first) || graph.getRoot(vertices.second) != graph.getRoot(vertices.second)) {
+        std::cout << "BAD CONTRACTION!!!!! VERTICES ARE NOT ROOTS\n";
       }
       
       graph.joinVertices(vertices.first, vertices.second);

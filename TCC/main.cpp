@@ -27,7 +27,7 @@ int main() {
    
 
     std::cout << "BEGIN PARSING INPUT\n";
-    auto parser = input::Parser(std::string("base.txt"));
+    auto parser = input::Parser(std::string("entrada_es.txt"));
     parser.parse();
     std::cout << "INPUT SUCCESSFULLY PARSED\n";
 

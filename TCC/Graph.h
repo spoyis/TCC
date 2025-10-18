@@ -12,8 +12,8 @@ std::mt19937 gen(5489); // RNG
 template <typename edge, typename vertex>
 class Graph { // begin class Graph
 private:
-	class AdjacencyMatrix; // see AdjacencyMatrix.h
-
+	class AdjacencyMatrix;
+		
 public:
 	using edge_t = edge;
 	using vertex_t = vertex;
@@ -21,17 +21,22 @@ public:
 	
 
 	Graph(int n) {
-		adjMatrix = new(n) AdjacencyMatrix;
+		adjMatrix = new AdjacencyMatrix(n);
+		adjMatrix->graphObj = this;
 		_vertexVal = new UnionFind<vertex>(n);
 		_vertexLabels = std::make_shared<std::vector<std::string>>(n);
 		_vertexCount = n;
+		degrees = std::vector<long>(n);
 	}
 
 	// Move constructor
 	Graph(Graph&& other) noexcept {
 		this->adjMatrix = other.adjMatrix;
+		adjMatrix->graphObj = this;
 		this->_vertexVal = other._vertexVal;
 		this->_vertexCount = other._vertexCount;
+		this->_vertexLabels = std::move(other._vertexLabels);
+		degrees = std::move(other.degrees);
 
 		other.adjMatrix = nullptr;
 		other._vertexVal = nullptr;
@@ -42,10 +47,12 @@ public:
 		delete this->adjMatrix;
 		delete this->_vertexVal;
 
+
 		this->_vertexVal = other._vertexVal;
 		this->adjMatrix = other.adjMatrix;
 		this->_vertexCount = other._vertexCount;
 		this->_vertexLabels = std::move(other._vertexLabels);
+		degrees = std::move(other.degrees);
 
 		adjMatrix->graphObj = this;
 		other.adjMatrix = nullptr;
@@ -69,34 +76,66 @@ public:
 
 		return true;
 	}
+	
+	const typename Graph::AdjacencyMatrix::RowProxy operator[](int n) const {
+		return (*adjMatrix)[n];
+	}
 
-	// returns adjacencymatrix ROW
-	AdjacencyMatrix& operator[](int n) { return *(adjMatrix + (n * _vertexCount)); }
+	typename Graph::AdjacencyMatrix::RowProxy operator[](int n)  {
+		return (*adjMatrix)[n];
+	}
+
+	edge& at(int i, int j) {
+		return adjMatrix->data[i * _vertexCount + j];
+	}
+
+	void updateDegree(int i, int j, edge oldValue, edge newValue) {
+		if (this->getRoot(i) != i) {
+			std::cout << "[DEGREE SKIP] Non-root vertex " << i << '\n';
+			return; // only root vertices count
+		}
+
+		if (i == j) {
+			//std::cout << "[DEGREE SKIP] Self-loop at vertex " << i << "\n";
+			return; // skip self-loops
+		}
+		if (oldValue == newValue) return;
+		if (oldValue == 0 && newValue == 1) {
+			degrees[i]++;
+		}
+		else if (oldValue != 0 && newValue == 0) {
+			degrees[i]--;
+		}
+	}
+
+	void rawSetEdge(int i, int j, edge value) {
+		adjMatrix->data[i * _vertexCount + j] = value;
+	}
 
 	// checks if the given graph is the complete graph or not
 	// undirected graph
 	bool isUndirectedComplete() {
-		const edge* matrix = (edge*)adjMatrix;
+		const edge* matrix = adjMatrix->data;
 
-		for (int i = 0; i < _vertexCount; i++)
-			for (int j = i + 1; j < _vertexCount; j++)
-			{
+		for (int i = 0; i < _vertexCount; i++) {
+			for (int j = i + 1; j < _vertexCount; j++) {
 				auto i_root = _vertexVal->findRoot(i);
 				auto j_root = _vertexVal->findRoot(j);
 				if (i_root == j_root) continue;
 				if (!matrix[i_root * _vertexCount + j_root]) return false;
 			}
+		}
 		return true;
 	}
 	// checks if the given graph is the complete graph or not
 	// directed graph
 	bool isDirectedComplete() {
-		// TODO: MAKE THE LOGIC HERE BETTER, FIX FOR JOINED VERTICES
-		const edge* matrix = (edge*)adjMatrix;
 		for (int i = 0; i < _vertexCount; i++) {
 			for (int j = 0; j < _vertexCount; j++) {
 				if (i == j) continue;
-				if (!matrix[i * _vertexCount + j])
+
+				// Use the adjacency matrix directly
+				if (!(*adjMatrix)[i][j])  // RowProxy + EdgeSetter
 					return false;
 			}
 		}
@@ -224,7 +263,7 @@ public:
 						degree++;
 					}
 				}
-
+				if (degrees[v] != degree)  std::cout << "NO GOT " << degrees[v] << " expected: " << degree << '\n';;
 				scored.push_back({ v, degree });
 			}
 
@@ -393,11 +432,13 @@ public:
 
 	void joinEdgeData(int index1, int index2) {
 		for (long i = 0; i < _vertexCount; i++) {
-			this->operator[](index1)[i] |= this->operator[](index2)[i];
-		}
+			auto rootI = this->getRoot(i);
+			if (i != rootI) continue;
 
-		for (long i = 0; i < _vertexCount; i++) {
+			this->operator[](index1)[i] |= this->operator[](index2)[i];
 			this->operator[](i)[index1] |= this->operator[](i)[index2];
+
+			(*this)[i][index2] = 0; // remove incoming edges to non root vertex, keeps degree tracking accurate.
 		}
 	}
 
@@ -418,6 +459,7 @@ private:
 	UnionFind<vertex>* _vertexVal;
 	int _vertexCount;
 	std::shared_ptr<std::vector<std::string>> _vertexLabels;
+	std::vector<long>degrees;
 
 
 protected:
@@ -425,11 +467,89 @@ protected:
 	Graph(const Graph& other) {
 		_vertexCount = other._vertexCount;
 		adjMatrix = other.adjMatrix->clone(_vertexCount);
+		adjMatrix->graphObj = this;
 		_vertexVal = other._vertexVal->clone();
+		degrees = other.degrees;
 		_vertexLabels = other._vertexLabels;
 		//adjMatrix->graphObj = this;
 	}
 }; // end class Graph
 
-#include "AdjacencyMatrix.h"
-// DIMACS
+template<typename edge, typename vertex>
+class Graph<edge,vertex>::AdjacencyMatrix {
+	public:
+		edge* data;
+		int vertexCount;
+		Graph* graphObj; // back-reference to Graph
+
+		// Row proxy to allow graph[i][j] syntax
+		struct RowProxy {
+			edge* row;
+			int rowIndex;
+			Graph* graph;
+
+			// read access
+			edge operator[](int col) const {
+				return row[col];
+			}
+
+			// write access
+			struct EdgeSetter {
+				edge& ref;
+				int i, j;
+				Graph* graph;
+
+				operator edge() const { return ref; } // allow reading
+
+				EdgeSetter& operator=(edge value) {
+					if (graph) graph->updateDegree(i, j, ref, value);
+					else std::cout << "[EDGESETTER GRAPH IS NULL] BAD!!!!!!!\n";
+					ref = value;
+					return *this;
+				}
+
+				EdgeSetter& operator|=(const edge& value) {
+					*this = ref | value; // calls operator=
+					return *this;
+				}
+
+			};
+
+			EdgeSetter operator[](int col) {
+				return EdgeSetter{ row[col], rowIndex, col, graph };
+			}
+		};
+
+		// access row
+		RowProxy operator[](int n) {
+			return RowProxy{ data + n * vertexCount, n, graphObj };
+		}
+
+		// const access row
+		const RowProxy operator[](int n) const {
+			return RowProxy{ data + n * vertexCount, n, graphObj };
+		}
+
+		// constructor (allocate data)
+		AdjacencyMatrix(int vertices) : vertexCount(vertices) {
+			data = new edge[vertices * vertices]();
+			graphObj = nullptr;
+		}
+
+		// copy constructor
+		AdjacencyMatrix(const AdjacencyMatrix& other) {
+			vertexCount = other.vertexCount;
+			data = new edge[vertexCount * vertexCount];
+			std::copy(other.data, other.data + vertexCount * vertexCount, data);
+			graphObj = nullptr; // copy doesn't link to Graph
+		}
+
+		// destructor
+		~AdjacencyMatrix() {
+			delete[] data;
+		}
+
+		AdjacencyMatrix* clone(int vertices) const {
+			return new AdjacencyMatrix(*this); // uses the copy constructor
+		}
+};

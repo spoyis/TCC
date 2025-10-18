@@ -58,6 +58,14 @@ private:
     long remainingCapacity() {
       return capacity - flow;
     }
+
+    bool operator==(const FordFulkersonEdge& other) const {
+      return capacity == other.capacity && flow == other.flow;
+    }
+
+    bool operator!=(const FordFulkersonEdge& other) const {
+      return !(*this == other);
+    }
   };
   Graph<FordFulkersonEdge, long>flowGraph;
   std::vector<long> visited;
@@ -73,7 +81,7 @@ private:
 
     for (long i = 1; i <= target; i++) {
       if (i == vertex || visited[i] == visitIndex) continue;
-      FordFulkersonEdge& outgoingEdge = flowGraph[vertex][i];
+      FordFulkersonEdge& outgoingEdge = flowGraph.at(vertex, i); 
       if (outgoingEdge.capacity != invalid_flow_edge && outgoingEdge.remainingCapacity()) {
         if (dfs(i)) {
           augment(vertex, i);
@@ -85,8 +93,8 @@ private:
   }
 
   void augment(long v1, long v2) {
-    FordFulkersonEdge& outgoingEdge = flowGraph[v1][v2];
-    FordFulkersonEdge& residualEdge = flowGraph[v2][v1];
+    FordFulkersonEdge& outgoingEdge = flowGraph.at(v1, v2);
+    FordFulkersonEdge& residualEdge = flowGraph.at(v2,v1);
 
     outgoingEdge.flow += 1;
     residualEdge.flow -= 1;
