@@ -213,104 +213,96 @@ public:
 	}
 
 	clique_t findCliqueGrasp(const clique_t& initialClique = {}, int maxIterations = 5) {
-	clique_t bestClique;
+		clique_t bestClique;
 
-	for (int iter = 0; iter < maxIterations; iter++) {
-		clique_t clique;
+		for (int iter = 0; iter < maxIterations; iter++) {
+			clique_t clique;
 
-		if (initialClique.empty()) {
-			std::uniform_int_distribution<> distrib(0, _vertexCount - 1);
-			int current = getRoot(distrib(gen));
-			clique.push_back(current);
-		} else {
-			clique = initialClique;
-		}
+			if (initialClique.empty()) {
+				std::uniform_int_distribution<> distrib(0, _vertexCount - 1);
+				int current = getRoot(distrib(gen));
+				clique.push_back(current);
+			}
+			else {
+				clique = initialClique;
+			}
 
-		// Candidate set = all other vertices
-		std::vector<int> candidates;
-		for (int i = 0; i < _vertexCount; i++) {
-			int root = getRoot(i);
+			// Candidate set = all root vertices not in clique
+			std::vector<int> candidates;
+			for (int i = 0; i < _vertexCount; i++) {
+				int root = getRoot(i);
 			if (std::find(clique.begin(), clique.end(), i) == clique.end() && root == i) {
-				candidates.push_back(i);
+					candidates.push_back(i);
+				}
+			}
+
+			while (!candidates.empty()) {
+				struct CandidateScore {
+					int v;
+					int score;
+				};
+				std::vector<CandidateScore> scored;
+
+				for (int v : candidates) {
+					// Check if v is adjacent to all current clique members
+					bool isNeighbor = true;
+					for (int c : clique) {
+						if (!(*this)[v][c]) {
+							isNeighbor = false;
+							break;
+						}
+					}
+					if (!isNeighbor) continue;
+
+					// Use tracked degree directly
+					scored.push_back({ v, degrees[v] });
+				}
+
+				if (scored.empty()) break;
+
+				// Find max score
+				int maxScore = -1;
+				for (auto& s : scored) {
+					if (s.score > maxScore) maxScore = s.score;
+				}
+
+				// RCL: top scorers within 80% of max
+				std::vector<int> rcl;
+				for (auto& s : scored) {
+					if (s.score >= (maxScore * 0.8)) {
+						rcl.push_back(s.v);
+					}
+				}
+
+				// Pick random from RCL
+				std::uniform_int_distribution<> d(0, (int)rcl.size() - 1);
+				int chosen = rcl[d(gen)];
+				clique.push_back(chosen);
+
+				// Update candidates: keep only vertices adjacent to all in clique
+				std::vector<int> newCandidates;
+				for (int v : candidates) {
+					if (v == chosen) continue;
+					bool ok = true;
+					for (int c : clique) {
+						if (!(*this)[v][c]) {
+							ok = false;
+							break;
+						}
+					}
+					if (ok) newCandidates.push_back(v);
+				}
+				candidates.swap(newCandidates);
+			}
+
+			if (clique.size() > bestClique.size()) {
+				bestClique = clique;
 			}
 		}
 
-		while (!candidates.empty()) {
-			// Build restricted candidate list (RCL)
-			struct CandidateScore {
-				int v;
-				int score;
-			};
-			std::vector<CandidateScore> scored;
-
-			for (int v : candidates) {
-				// Check if v is adjacent to all current clique members
-				bool isNeighbor = true;
-				for (int c : clique) {
-					if (!this->operator[](v)[c]) {
-						isNeighbor = false;
-						break;
-					}
-				}
-				if (!isNeighbor) continue;
-
-				// Heuristic: degree of v
-				int degree = 0;
-				for (int k = 0; k < _vertexCount; k++) {
-					int rootK = getRoot(k);
-					if (rootK != k)continue;
-					if (rootK != v && this->operator[](v)[rootK]) {
-						degree++;
-					}
-				}
-				if (degrees[v] != degree)  std::cout << "NO GOT " << degrees[v] << " expected: " << degree << '\n';;
-				scored.push_back({ v, degree });
-			}
-
-			if (scored.empty()) break;
-
-			// Find max score
-			int maxScore = -1;
-			for (auto& s : scored) {
-				if (s.score > maxScore) maxScore = s.score;
-			}
-
-			// RCL: (top scorers within 80% of max)
-			std::vector<int> rcl;
-			for (auto& s : scored) {
-				if (s.score >= (maxScore * 0.8)) {
-					rcl.push_back(s.v);
-				}
-			}
-
-			// Pick random from RCL
-			std::uniform_int_distribution<> d(0, (int)rcl.size() - 1);
-			int chosen = rcl[d(gen)];
-			clique.push_back(chosen);
-
-			// Update candidates: keep only vertices adjacent to all in clique
-			std::vector<int> newCandidates;
-			for (int v : candidates) {
-				if (v == chosen) continue;
-				bool ok = true;
-				for (int c : clique) {
-					if (!this->operator[](v)[c]) {
-						ok = false;
-						break;
-					}
-				}
-				if (ok) newCandidates.push_back(v);
-			}
-			candidates.swap(newCandidates);
-		}
-
-		if (clique.size() > bestClique.size()) {
-			bestClique = clique;
-		}
+		return bestClique;
 	}
 
-	return bestClique;
-}
 
 
 	clique_t findCliqueRandom(const clique_t& initialClique = {}) {
@@ -447,11 +439,8 @@ public:
 	}
 
 	long getVertexDegree(int index) {
-		long output = 0;
-		for (long i = 0; i < _vertexCount; i++) {
-			if (this->operator[](index)[i] && i != index) output++;
-		}
-		return output;
+		long root = this->getRoot(index);
+		return degrees[root];
 	}
 
 private:

@@ -591,23 +591,29 @@ namespace Coloring {// begin namespace Coloring
       long maxDegree = 0;
       long vertexCount = graph.getVertexCount();
       long bestVertex = 0;
+
       for (long i = 0; i < vertexCount; i++) {
         long rootI = graph.getRoot(i);
-        if (rootI < i) 
-          continue;
-        long degree = 0;
-        for (long j = 0; j < vertexCount; j++) {
-          long rootJ = graph.getRoot(j);
-          if (rootJ < j) continue;
-          if (i != j && graph[rootI][rootJ]) degree++;
-          else if (i != j && !graph[rootI][rootJ] && searchForNonJoinableVertices)
-            nonNeighbors.push_back({ i,j });
+        if (rootI < i) continue;
+
+        long degree = graph.getVertexDegree(rootI); 
+
+        if (searchForNonJoinableVertices) {
+          for (long j = 0; j < vertexCount; j++) {
+            long rootJ = graph.getRoot(j);
+            if (rootJ < j) continue;
+            if (i != j && !graph[rootI][rootJ]) {
+              nonNeighbors.push_back({ i, j });
+            }
+          }
         }
+
         if (degree > maxDegree) {
           maxDegree = degree;
           bestVertex = i;
         }
       }
+
       _upperBound = maxDegree + 1; // Degree-based upper bound
 
       // SET GRAPHDENSITY
