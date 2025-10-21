@@ -3,8 +3,21 @@
 #include "Graph.h"
 #include "BipartiteMatching.h"
 #include <map>
-
+#include <set>
 namespace Coloring::Validator { // begin namespace Coloring::Validator
+
+  namespace color {
+    const std::string red("\033[0;31m");
+    const std::string green("\033[1;32m");
+    const std::string yellow("\033[1;33m");
+    const std::string blue("\033[1;34m");
+    const std::string cyan("\033[0;36m");
+    const std::string magenta("\033[0;35m");
+    const std::string reset("\033[0m");
+  }
+
+  static const std::string PASS = "- " + color::green + "[PASSED]: " + color::reset;
+  static const std::string FAIL = "- " + color::red + "[FAILED]: " + color::reset;
 
   enum ValidationState {
     VALID,
@@ -20,7 +33,14 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
 
   // validates a clique
   template<typename edge, typename vertex>
-  ValidationState clique(clique_t clique, Graph<edge,vertex>& g, std::vector<std::vector<long>> roomData) {
+  ValidationState clique(
+    clique_t clique,
+    Graph<edge, vertex>& g,
+    std::vector<std::vector<long>> roomData,
+    bool shouldSaveColoringData = false,                    // optional input
+    std::vector<std::pair<long, long>>* timeslotMatches = nullptr,  // optional output
+    std::map<long, std::vector<std::pair<long, long>>>* roomMatches = nullptr // optional output
+  ) {
     vertex colors;
     
     for (auto& v : clique) {
@@ -57,6 +77,8 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
       auto& colorArray = g.getVertexData(clique[v]);
       timeslotValidation.defineInitialCapacity(v, 1);
       for (auto color : colorArray) {
+        //if (timeslotMatches)
+         // std::cout << "CLIQUE ROOT " << clique[v] << " ACCEPTS " << color << '\n';
         for (long c = 0; c < colors.size(); c++) {
           if (color == colors[c]) {
             //std::cout << "[DEBUG] ADDING EDGE FROM " << v << " TO " << c << '\n';
@@ -87,6 +109,14 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
       }
       */
       return INVALID_TIMESLOT_COLORING;
+    }
+
+    // optionally store timeslot matching
+    if (shouldSaveColoringData && timeslotMatches) {
+      *timeslotMatches = timeslotValidation.getMatching(clique);
+      for (long i = 0; i < timeslotMatches->size(); i++) {
+        (*timeslotMatches)[i].second = colors[(*timeslotMatches)[i].second];
+      }
     }
 
 
@@ -178,11 +208,101 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
 
         return INVALID_ROOM_COLORING;
       }
+
+      // optionally store room matching
+      if (shouldSaveColoringData && roomMatches) {
+        (*roomMatches)[cliqueGroup.first] = roomValidation.getMatching(cliqueGroupArray);
+        // loop over the vector of pairs and remap the second element to the correct value
+        for (long i = 0; i < (*roomMatches)[cliqueGroup.first].size(); i++) {
+          long localIndex = (*roomMatches)[cliqueGroup.first][i].second;
+          (*roomMatches)[cliqueGroup.first][i].second = joinedRoomArray[localIndex];
+        }
+      }
     }
 
     return VALID;
   }
 
+  template<typename edge, typename vertex>
+  bool coloringOutput(
+    const std::vector<Coloring::ColoringOutput::SolutionData>& output,
+    Graph<edge, vertex>& g,
+    const std::vector<std::vector<long>>& roomData
+  ) {
+    std::cout << "[VALIDATION] BEGIN VALIDATION ON CURRENT SOLUTION\n";
+    long vertexCount = g.getVertexCount();
+
+    // --- [1] Every vertex should have a valid timeslot color ---
+    for (long v = 0; v < vertexCount; ++v) {
+      long root = g.getRoot(v);
+      long timeslotColor = output[v].timeslotColor;
+
+      const auto& allowedTimeslots = g.getVertexData(root);
+
+      bool found = false;
+      for (auto t : allowedTimeslots) {
+        //std::cout << "ALLOWED TIMESLOTS FOR ROOT " << g.getRoot(v) << ": " << t << '\n';
+        if (t == timeslotColor) {
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        std::cerr << FAIL <<"[ERROR] Vertex " << v << " has invalid timeslot color " << timeslotColor
+          << " not in root " << root << " allowed set.\n";
+        return false;
+      }
+    }
+
+    std::cout << PASS << "TIMESLOT VALIDATION " << std::endl;
+
+    // --- [2] Every vertex should have a valid room color ---
+    for (long v = 0; v < vertexCount; ++v) {
+      long roomColor = output[v].roomColor;
+
+      const auto& allowedRooms = roomData[v];
+      bool found = false;
+      for (auto r : allowedRooms) {
+        if (r == roomColor) {
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        std::cerr << FAIL << "[ERROR] Vertex " << v << " has invalid room color " << roomColor << ".\n";
+
+        for (long i = 0; i < roomData[v].size(); i++) {
+          std::cout << "ALLOWED COLORS ARE: " << roomData[v][i] << '\n';
+        }
+        return false;
+      }
+    }
+
+    std::cout << PASS << "ROOM VALIDATION " << std::endl;
+
+    // --- [3] No two (timeslot, room) pairs should repeat ---
+    std::set<std::pair<long, long>> usedPairs;
+
+    for (long v = 0; v < vertexCount; ++v) {
+      long t = output[v].timeslotColor;
+      long r = output[v].roomColor;
+      auto pair = std::make_pair(t, r);
+
+      if (usedPairs.find(pair) != usedPairs.end()) {
+        std::cerr << FAIL << "[ERROR] Duplicate (timeslot, room) pair found: ("
+          << t << ", " << r << ") for vertex " << v << ".\n";
+        return false;
+      }
+      else {
+        usedPairs.insert(pair);
+      }
+    }
+    std::cout << PASS << "UNIQUE COLOR PAIR VALIDATION " << std::endl;
+    // If we reach here, all checks passed
+    return true;
+  }
 
   // quickly checks if any vertices are missing colors, immediately invalidating the whole instance
   // this is used only on the root vertex of a Checker instance.

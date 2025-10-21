@@ -3,6 +3,7 @@
 #include "Graph.h"
 #include "BipartiteMatching.h"
 #include <queue>
+#include "ColoringOutput.h"
 #include "validator.h"
 #include <stdexcept>
 
@@ -70,8 +71,8 @@ namespace Coloring {// begin namespace Coloring
       other._initialVertexCount = 0;
     }
 
-    int run() {
-      if (Validator::naiveCheck<edge, vertex>(*_originalGraph, roomData) == Validator::MISSING_COLORS) return -1;
+    ColoringOutput run() {
+      if (Validator::naiveCheck<edge, vertex>(*_originalGraph, roomData) == Validator::MISSING_COLORS) _output;
 
       if (isEnabled(ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS)) {
         sameTimeDifferentRoomsOptimization();
@@ -130,6 +131,12 @@ namespace Coloring {// begin namespace Coloring
           auto result = current->processNode(getStrategy(), getEval(), searchQueue);
           processedNodeStatistics[result]++;
 
+          if (hasSolution) {
+            if(_isRootChecker)
+              writeSolution(current);
+            break;
+          }
+
           if (shouldRunRecursiveCheck(result) && false) {
             // create new problem instance
             // the instance will be a subgraph of the original graph with the failing clique.
@@ -141,6 +148,9 @@ namespace Coloring {// begin namespace Coloring
             recursiveChecker.setRecursiveInstanceFlag();
             auto recursiveResult = recursiveChecker.run();
             if (!recursiveChecker.hasSolution ) {
+              // Currently does nothing
+              // IMPORTANT: THIS SHOULD KILL THE WHOLE CHECKER TREE
+              // wasnt fully implemented because this block never actually ran
               std::cout << "HOLY SHIT!!!!\n";
               std::cout << "HOLY SHIT!!!!\n";
               std::cout << "HOLY SHIT!!!!\n";
@@ -152,7 +162,7 @@ namespace Coloring {// begin namespace Coloring
               std::cout << "HOLY SHIT!!!!\n";
               break;
             }
-            std::cout << "RECURSION RESULTED IN " << recursiveResult << '\n';
+            std::cout << "RECURSION RESULTED IN A SUCCESS" << '\n';
             extraValidationStepCounter = 0;
           }
 
@@ -169,7 +179,8 @@ namespace Coloring {// begin namespace Coloring
         delete searchQueue.top();
         searchQueue.pop();
       }
-      return _bestAnswer;
+
+      return _output;
     }
 
     void setStrategy(Heuristic::Enums value) {
@@ -184,6 +195,7 @@ namespace Coloring {// begin namespace Coloring
    
     using edge = typename graph_t::edge_t;
     using vertex = typename graph_t::vertex_t;
+
     bool _isRootChecker{ true };
     bool _areBadCliqueCleanupsEnabled{ true };
     bool _areRecursiveChecksEnabled{ true };
@@ -191,16 +203,18 @@ namespace Coloring {// begin namespace Coloring
     long _initialVertexCount;
     long extraValidationStepCounter = { 0 };
     bool hasSolution{ false };
+    ColoringOutput _output{ DEFAULT_NO_SOLUTION };
+
     Graph<edge, vertex>* _originalGraph;
     Heuristic::Enums strategy{ Heuristic::STRATEGY_DEFAULT };
     Heuristic::Enums eval{ Heuristic::EVAL_DEFAULT };
     std::vector<bool> optimizationStrategies{false, false};
     std::vector<std::vector<long>> roomData;
-    std::vector<long> processedNodeStatistics{0,0,0,0,0,0};
-
+    
     // Statistics
     long nodesExplored = 0;
     long nodesPruned = 0;
+    std::vector<long> processedNodeStatistics{ 0,0,0,0,0,0 };
 
     Heuristic::strategy<edge,vertex> getStrategy() {
       switch (strategy) {
@@ -391,13 +405,86 @@ namespace Coloring {// begin namespace Coloring
       for (Zykov* node : duplicateQueue) {
         searchQueue.push(node);
       }
-
-
+      auto removed = extractQueue.size() - duplicateQueue.size();
+      if(removed)
       std::cout << "[CLEANUP] Removed "
-        << (extractQueue.size() - duplicateQueue.size())
+        << removed
         << " nodes with duplicate bad clique\n";
     }
 
+    void writeSolution(Zykov* leafNode) {
+      Graph<edge, vertex>& graph = *leafNode->getGraph();
+      long vertexCount = graph.getVertexCount();
+
+      std::cout << "\n=========================\n";
+      std::cout << "VALID SOLUTION FOUND!\n";
+      std::cout << "=========================\n";
+      std::cout << "Original vertex count: " << vertexCount << "\n";
+      std::cout << "Graph density: " << leafNode->getGraphDensity() << " (should be 1)\n";
+      std::cout << "Search depth: " << leafNode->getNodeDepth() << "\n";
+      std::cout << "Lower bound: " << leafNode->getLowerBound() << "\n";
+      std::cout << "Upper bound: " << leafNode->getUpperBound() << "\n";
+      std::cout << "-------------------------\n";
+
+      std::vector<long> roots = graph.findCliqueRandom();
+      // containers for coloring data
+      std::vector<std::pair<long, long>> timeslotMatches;
+      std::map<long, std::vector<std::pair<long, long>>> roomMatches;
+
+      // map of root -> vector of its vertices
+      std::map<long, std::vector<long>> vertexMap;
+      for (long v = 0; v < vertexCount; ++v) {
+        long root = graph.getRoot(v);
+        vertexMap[root].push_back(v);
+      }
+
+      Validator::ValidationState state = Validator::clique(
+        roots,
+        graph,
+        roomData,
+        true,                 // shouldSaveColoringData
+        &timeslotMatches,     // output timeslot matches
+        &roomMatches          // output room matches
+      );
+
+      if (state == Validator::VALID) {
+        _output.solutionStatus = ColoringOutput::HAS_SOLUTION;
+        std::vector<ColoringOutput::SolutionData>& solution = _output.solutionData;
+        solution.resize(vertexCount);
+
+        //std::cout << "[INFO] Timeslot matching:\n";
+        for (auto [v, slot] : timeslotMatches) {
+          //std::cout << "Vertex " << v << " -> Timeslot " << slot << "\n";
+          auto vertices = vertexMap[v];
+          for (auto originalVertex : vertices) {
+            //std::cout << "ORIGINALVERTEX " << originalVertex << " -> Timeslot " << slot << "\n";
+            solution[originalVertex].timeslotColor = slot;
+          }
+        }
+
+        //std::cout << "[INFO] Room matching:\n";
+        for (auto& [vertex, matches] : roomMatches) {
+          //std::cout << "Vertex group " << vertex << ":\n";
+          for (auto& [v, room] : matches) {
+            //std::cout << "  Original vertex " << v << " -> Room " << room << "\n";
+            solution[v].roomColor = room;
+          }
+        }
+
+
+        if (!Validator::coloringOutput(solution, graph, roomData)) {
+          std::cout << "[ERROR] OUTPUT FAILED VALIDATION!\n";
+        }
+        else std::cout << "[OUTPUT] PASSED ALL CHECKS!\n";
+
+      }
+      else {
+        std::cerr << "[ERROR] Invalid solution detected!\n";
+        throw std::runtime_error("Solution verification failed.");
+      }
+    }
+
+    
   }; // end class Coloring::Checker
 
 

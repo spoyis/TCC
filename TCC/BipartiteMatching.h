@@ -45,6 +45,24 @@ public:
     }
     return output;
   }
+
+  std::vector<std::pair<long, long>> getMatching(const std::vector<long>& leftMapping) {
+    std::vector<std::pair<long, long>> matches;
+
+    for (long u = 0; u < firstPartitionSize; u++) {
+      long vertexIndex = u + 1;
+      for (long v = firstPartitionSize + 1; v < firstPartitionSize + secondPartitionSize + 1; v++) {
+        auto& edge = flowGraph.at(vertexIndex, v);
+        if (edge.capacity != invalid_flow_edge && edge.flow > 0) {
+          // map u to the *global vertex ID* using leftMapping
+          matches.emplace_back(leftMapping[u], v - (firstPartitionSize + 1));
+          break;
+        }
+      }
+    }
+
+    return matches;
+  }
   
 private:
   

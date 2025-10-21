@@ -519,7 +519,6 @@ class Graph<edge,vertex>::AdjacencyMatrix {
 			return RowProxy{ data + n * vertexCount, n, graphObj };
 		}
 
-		// constructor (allocate data)
 		AdjacencyMatrix(int vertices) : vertexCount(vertices) {
 			data = new edge[vertices * vertices]();
 			graphObj = nullptr;
