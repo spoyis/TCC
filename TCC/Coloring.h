@@ -229,6 +229,9 @@ namespace Coloring {// begin namespace Coloring
 
       case Heuristic::STRATEGY_SHARED_NEIGHTBORS:
         return &Heuristic::mostSharedNeighbors<edge, vertex>;
+
+      case Heuristic::STRATEGY_RANDOM_COLOR_INTERSECTION:
+        return &Heuristic::randomLargestColorIntersection<edge, vertex>;
       }
     }
 

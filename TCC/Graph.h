@@ -383,6 +383,29 @@ public:
 			return true;
 	}
 
+	int colorIntersectionSize(int index1, int index2) {
+		return colorIntersectionSizeHelper<vertex>(index1, index2);
+	}
+
+	// For vertices that store a vector of colors (list-coloring context)
+	template <class Vector>
+	typename std::enable_if<is_specialization<Vector, std::vector>::value, int>::type
+		colorIntersectionSizeHelper(int index1, int index2) {
+		UnionFind<vertex>& unionfind = *_vertexVal;
+		int count = 0;
+
+		for (const auto& color_1 : unionfind[index1]) {
+			for (const auto& color_2 : unionfind[index2]) {
+				if (color_1 == color_2) {
+					++count;
+				}
+			}
+		}
+		return count;
+	}
+
+
+
 	// BEGIN JOINVERTEXDATA METHODS
 	void joinVertexData(int index1, int index2) {
 		UnionFind<vertex>& unionfind = *_vertexVal;

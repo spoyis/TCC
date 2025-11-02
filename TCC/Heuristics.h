@@ -11,7 +11,8 @@ namespace Coloring::Heuristic
     STRATEGY_LOWEST_DEGREE,
     STRATEGY_RANDOM_FROM_CLIQUE,
     STRATEGY_SHARED_NEIGHTBORS,
-    
+    STRATEGY_RANDOM_COLOR_INTERSECTION,
+
     EVAL_NAIVE,
 
     EVAL_DEFAULT = EVAL_NAIVE,
@@ -127,43 +128,93 @@ namespace Coloring::Heuristic
 
   // Returns the two vertices that share the most common neighbors
   template<typename edge, typename vertex>
-  std::pair<long, long> mostSharedNeighbors(Graph<edge, vertex>& g, eval<edge> evalfunc, std::vector<long> clique, long lastVertex, long vertexCount) {
-    long bestV1 = -1;
-    long bestV2 = -1;
-    long maxSharedNeighbors = -1;
+  std::pair<long, long> mostSharedNeighbors(Graph<edge, vertex>& g, eval<edge> evalfunc,
+    std::vector<long> clique, long lastVertex, long vertexCount) {
+    struct PairScore {
+      long v1;
+      long v2;
+      long score;
+    };
+
+    std::vector<PairScore> scores;
 
     for (long i = 0; i <= lastVertex; i++) {
       long root1 = g.getRoot(i);
 
       for (long j = i + 1; j <= lastVertex; j++) {
         long root2 = g.getRoot(j);
-
         if (root1 == root2) continue;
-        if (!evalfunc(g[root1][root2])) continue;
+        if (!evalfunc(g[root1][root2])) continue;  // skip adjacent
 
         long sharedCount = 0;
         for (long k = 0; k <= lastVertex; k++) {
           long root3 = g.getRoot(k);
           if (root3 == root1 || root3 == root2) continue;
 
-          // Check if k is a neighbor of both root1 and root2
-          bool isNeighborOf1 = !evalfunc(g[root1][root3]); 
-          bool isNeighborOf2 = !evalfunc(g[root2][root3]); 
-
-          if (isNeighborOf1 && isNeighborOf2) {
-            sharedCount++;
-          }
+          bool isNeighborOf1 = !evalfunc(g[root1][root3]);
+          bool isNeighborOf2 = !evalfunc(g[root2][root3]);
+          if (isNeighborOf1 && isNeighborOf2) sharedCount++;
         }
 
-        if (sharedCount > maxSharedNeighbors) {
-          maxSharedNeighbors = sharedCount;
-          bestV1 = root1;
-          bestV2 = root2;
+        scores.push_back({ root1, root2, sharedCount });
+      }
+    }
+
+    if (scores.empty()) return { -1, -1 };
+
+    // Sort pairs descending by shared neighbor count
+    std::sort(scores.begin(), scores.end(),
+      [](const PairScore& a, const PairScore& b) { return a.score > b.score; });
+
+    // Take the top 10% (or at least one element)
+    size_t topCount = std::max<size_t>(1, scores.size() / 100);
+    std::uniform_int_distribution<size_t> dist(0, topCount - 1);
+
+    auto& chosen = scores[dist(gen)];
+    return { chosen.v1, chosen.v2 };
+  }
+
+
+
+  // Randomly selects a non-adjacent vertex pair with the largest color-list intersection
+  template<typename edge, typename vertex>
+  std::pair<long, long> randomLargestColorIntersection(
+    Graph<edge, vertex>& g,
+    eval<edge> evalfunc,
+    std::vector<long> clique,
+    long lastVertex,
+    long vertexCount)
+  {
+    long maxIntersection = -1;
+    std::vector<std::pair<long, long>> bestPairs;
+
+    for (long i = 0; i <= lastVertex; i++) {
+      long root1 = g.getRoot(i);
+
+      for (long j = i + 1; j <= lastVertex; j++) {
+        long root2 = g.getRoot(j);
+        if (root1 == root2) continue;
+        if (!evalfunc(g[root1][root2])) continue; // skip adjacent
+
+
+        int intersection = g.colorIntersectionSize(root1, root2);
+        if (intersection == 0) continue;
+
+        if (intersection > maxIntersection) {
+          maxIntersection = intersection;
+          bestPairs.clear();
+          bestPairs.emplace_back(root1, root2);
+        }
+        else if (intersection == maxIntersection) {
+          bestPairs.emplace_back(root1, root2);
         }
       }
     }
 
-    return { bestV1, bestV2 };
+    if (bestPairs.empty()) return { -1, -1 };
+
+    std::uniform_int_distribution<size_t> dist(0, bestPairs.size() - 1);
+    return bestPairs[dist(gen)];
   }
 
   template<typename edge>
