@@ -77,6 +77,10 @@ namespace Coloring {// begin namespace Coloring
       if (isEnabled(ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS)) {
         sameTimeDifferentRoomsOptimization();
       }
+
+      if (isEnabled(VERTICES_WITH_NO_COLOR_INTERSECTION)) {
+        preprocessNonJoinableEdges();
+      }
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator> searchQueue;
       // Create root Zykov
       Zykov* root = new Zykov(_originalGraph->cloneHeap(), _initialVertexCount, this);
@@ -286,6 +290,40 @@ namespace Coloring {// begin namespace Coloring
       }
     }
 
+    void preprocessNonJoinableEdges() {
+      Graph<edge, vertex>& graph = *_originalGraph;
+      long vertexCount = graph.getVertexCount();
+      std::vector<std::pair<long, long>> nonNeighbors;
+
+      // collect all non-adjacent vertex pairs
+      for (long i = 0; i < vertexCount; i++) {
+        long rootI = graph.getRoot(i);
+        if (rootI < i) continue;
+
+        for (long j = 0; j < vertexCount; j++) {
+          long rootJ = graph.getRoot(j);
+          if (rootJ < j) continue;
+          if (i != j && !graph[rootI][rootJ]) {
+            nonNeighbors.emplace_back(i, j);
+          }
+        }
+      }
+
+      long optimizationCounter = 0;
+      for (auto& [v1, v2] : nonNeighbors) {
+        if (!graph.areJoinable(v1, v2)) {
+          graph[v1][v2] = { 1 };
+          graph[v2][v1] = { 1 };
+          optimizationCounter++;
+        }
+      }
+
+      if (optimizationCounter != 0) {
+        std::cout << "[PREPROCESS][NON_JOINABLE] Added "
+          << optimizationCounter << " edges.\n";
+      }
+    }
+
     Checker<graph_t> createRecursiveInstance(Zykov* node) {
       std::vector<long> vertices = node->getJoinedVerticesFromClique(node->getBadClique());
 
@@ -340,7 +378,6 @@ namespace Coloring {// begin namespace Coloring
           }
         }
       }
-      std::cout << "[CLEANUP] REDUCED BAD CLIQUE BY  " << reductionCounter << '\n' << "[CLEANUP] BAD CLIQUE SIZE IS " << badClique.size() << '\n';
 
       std::vector<long> badVertices = badNode->getJoinedVerticesFromClique(badClique);
 
@@ -523,7 +560,7 @@ namespace Coloring {// begin namespace Coloring
       _currentVertexCount = _bestAnswer = size;
       _rightmostVertexIndex = size - 1;
       _checkerPtr = ptr;
-      computeBounds(ptr->isEnabled(VERTICES_WITH_NO_COLOR_INTERSECTION));
+      computeBounds();
     }
 
     long getLowerBound() const { return _lowerBound;}
@@ -675,61 +712,28 @@ namespace Coloring {// begin namespace Coloring
 
   private:
 
-    void computeBounds(bool searchForNonJoinableVertices = false) {
-      std::vector<std::pair<long, long>> nonNeighbors;
+    void computeBounds() {
       Graph<edge, vertex>& graph = *_graph;
-      long maxDegree = 0;
       long vertexCount = graph.getVertexCount();
+      long maxDegree = 0;
       long bestVertex = 0;
 
       for (long i = 0; i < vertexCount; i++) {
         long rootI = graph.getRoot(i);
         if (rootI < i) continue;
 
-        long degree = graph.getVertexDegree(rootI); 
-
-        if (searchForNonJoinableVertices) {
-          for (long j = 0; j < vertexCount; j++) {
-            long rootJ = graph.getRoot(j);
-            if (rootJ < j) continue;
-            if (i != j && !graph[rootI][rootJ]) {
-              nonNeighbors.push_back({ i, j });
-            }
-          }
-        }
-
+        long degree = graph.getVertexDegree(rootI);
         if (degree > maxDegree) {
           maxDegree = degree;
           bestVertex = i;
         }
       }
 
-      _upperBound = maxDegree + 1; // Degree-based upper bound
+      _upperBound = maxDegree + 1; // degree-based upper bound
 
-      // SET GRAPHDENSITY
-      double V = (double)_currentVertexCount;
-      double E = (double)(*_graph).getEdgeCount();
-
+      double V = static_cast<double>(_currentVertexCount);
+      double E = static_cast<double>(graph.getEdgeCount());
       _graphDensity = E / (V * (V - 1));
-
-
-      if (searchForNonJoinableVertices) {
-        long optimizationCounter = 0;
-        for (auto& vertexPair : nonNeighbors) {
-          auto v1 = vertexPair.first;
-          auto v2 = vertexPair.second;
-
-          // if can't be joined, place an edge.
-          if (!graph.areJoinable(v1, v2)) {
-            graph[v1][v2] = { 1 };
-            graph[v2][v1] = { 1 };
-
-            optimizationCounter++;
-          }
-        }
-        if(optimizationCounter != 0)
-        std::cout << "[OPTIMIZATION][NON_JOINABLE] OPTIMIZED " << optimizationCounter << " EDGES!\n";
-      }
     }
 
     // add edge constructor
