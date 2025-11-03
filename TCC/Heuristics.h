@@ -23,10 +23,23 @@ namespace Coloring::Heuristic
   using eval = long(*)(edge);
 
   template<typename edge, typename vertex>
-  using strategy = std::pair<long, long>(*)(Graph<edge,vertex>&, eval<edge> evalfunc, std::vector<long>, long, long);
+  using strategy = std::pair<long, long>(*)(
+    Graph<edge, vertex>&,
+    eval<edge> evalfunc,
+    const std::vector<std::vector<long>>& roomData,
+    std::vector<long> clique,
+    long lastVertex,
+    long vertexCount
+    );
 
   template<typename edge, typename vertex>
-  std::pair<long, long> firstValid(Graph<edge, vertex>& g, eval<edge> evalfunc, std::vector<long> clique, long lastVertex, long vertexCount) {
+  std::pair<long, long> firstValid(
+    Graph<edge, vertex>& g,
+    eval<edge> evalfunc,
+    const std::vector<std::vector<long>>&,
+    std::vector<long> clique,
+    long lastVertex,
+    long vertexCount) {
     for (int i = 0; i < clique.size(); i++)
     {
       long root1 = g.getRoot(clique[i]);
@@ -45,7 +58,13 @@ namespace Coloring::Heuristic
   // Chooses v1 as min degree vertex (sorted by degree)
  // v2 is first non neighbor
   template<typename edge, typename vertex>
-  std::pair<long, long> lowestDegree(Graph<edge, vertex>& g, eval<edge> evalfunc, std::vector<long> clique, long lastVertex, long vertexCount) {
+  std::pair<long, long> lowestDegree(
+    Graph<edge, vertex>& g,
+    eval<edge> evalfunc,
+    const std::vector<std::vector<long>>& ,
+    std::vector<long> clique,
+    long lastVertex,
+    long vertexCount) {
     // Create vector of pairs (degree, vertex) for sorting
     std::vector<std::pair<long, long>> degreeVertexPairs;
 
@@ -94,7 +113,13 @@ namespace Coloring::Heuristic
   // v1 is a random vertex from clique
   // v2 is a random vertex not in clique
   template<typename edge, typename vertex>
-  std::pair<long, long> randomFromClique(Graph<edge, vertex>& g, eval<edge> evalfunc, std::vector<long> clique, long lastVertex, long vertexCount) {
+  std::pair<long, long> randomFromClique(
+    Graph<edge, vertex>& g,
+    eval<edge> evalfunc,
+    const std::vector<std::vector<long>>&,
+    std::vector<long> clique,
+    long lastVertex,
+    long vertexCount) {
     std::uniform_int_distribution<long> distClique(0, clique.size() - 1);
 
     // Try each vertex in clique as root1 (in random order)
@@ -128,12 +153,19 @@ namespace Coloring::Heuristic
 
   // Returns the two vertices that share the most common neighbors
   template<typename edge, typename vertex>
-  std::pair<long, long> mostSharedNeighbors(Graph<edge, vertex>& g, eval<edge> evalfunc,
-    std::vector<long> clique, long lastVertex, long vertexCount) {
+  std::pair<long, long> mostSharedNeighbors(
+    Graph<edge, vertex>& g,
+    eval<edge> evalfunc,
+    const std::vector<std::vector<long>>& roomData,
+    std::vector<long> clique,
+    long lastVertex,
+    long vertexCount
+  ) {
     struct PairScore {
       long v1;
       long v2;
-      long score;
+      long sharedNeighbors;
+      long roomIntersection;
     };
 
     std::vector<PairScore> scores;
@@ -144,8 +176,9 @@ namespace Coloring::Heuristic
       for (long j = i + 1; j <= lastVertex; j++) {
         long root2 = g.getRoot(j);
         if (root1 == root2) continue;
-        if (!evalfunc(g[root1][root2])) continue;  // skip adjacent
+        if (!evalfunc(g[root1][root2])) continue; 
 
+        // Shared neighbor score 
         long sharedCount = 0;
         for (long k = 0; k <= lastVertex; k++) {
           long root3 = g.getRoot(k);
@@ -156,17 +189,28 @@ namespace Coloring::Heuristic
           if (isNeighborOf1 && isNeighborOf2) sharedCount++;
         }
 
-        scores.push_back({ root1, root2, sharedCount });
+        // Room intersection score
+        const auto& R1 = roomData[root1];
+        const auto& R2 = roomData[root2];
+        long roomShared = 0;
+        for (auto r1 : R1)
+          for (auto r2 : R2)
+            if (r1 == r2) roomShared++;
+
+        scores.push_back({ root1, root2, sharedCount, roomShared });
       }
     }
 
     if (scores.empty()) return { -1, -1 };
 
-    // Sort pairs descending by shared neighbor count
-    std::sort(scores.begin(), scores.end(),
-      [](const PairScore& a, const PairScore& b) { return a.score > b.score; });
+    // Sort primarily by shared neighbors, then room intersection
+    std::sort(scores.begin(), scores.end(), [](const PairScore& a, const PairScore& b) {
+      if (a.sharedNeighbors == b.sharedNeighbors)
+        return a.roomIntersection > b.roomIntersection;
+      return a.sharedNeighbors > b.sharedNeighbors;
+      });
 
-    // Take the top 10% (or at least one element)
+    // Top 1% random pick
     size_t topCount = std::max<size_t>(1, scores.size() / 100);
     std::uniform_int_distribution<size_t> dist(0, topCount - 1);
 
@@ -181,6 +225,7 @@ namespace Coloring::Heuristic
   std::pair<long, long> randomLargestColorIntersection(
     Graph<edge, vertex>& g,
     eval<edge> evalfunc,
+    const std::vector<std::vector<long>>& ,
     std::vector<long> clique,
     long lastVertex,
     long vertexCount)

@@ -27,7 +27,7 @@ int main() {
    
 
     std::cout << "BEGIN PARSING INPUT\n";
-    auto parser = input::Parser(std::string("2025-1.txt"));
+    auto parser = input::Parser(std::string("2025-2.txt"));
     parser.parse();
     std::cout << "INPUT SUCCESSFULLY PARSED\n";
 
@@ -37,6 +37,7 @@ int main() {
     checker.setStrategy(Coloring::Heuristic::STRATEGY_SHARED_NEIGHTBORS);
     checker.setOptimizationStrategy(Coloring::ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS, true);
     checker.setOptimizationStrategy(Coloring::VERTICES_WITH_NO_COLOR_INTERSECTION, true);
+    checker.setOptimizationStrategy(Coloring::ROOT_NODE_SINGLE_CONSTRAINT_PROPAGATION, true);
     auto result = checker.run();
     std::cout << "PROBLEM CHECKER FINISHED PROCESSING " << "\n";
   }

@@ -118,13 +118,17 @@ public:
 		const edge* matrix = adjMatrix->data;
 
 		for (int i = 0; i < _vertexCount; i++) {
+			int ri = _vertexVal->findRoot(i);
+			if (ri != i) continue; // skip non-roots
+
 			for (int j = i + 1; j < _vertexCount; j++) {
-				auto i_root = _vertexVal->findRoot(i);
-				auto j_root = _vertexVal->findRoot(j);
-				if (i_root == j_root) continue;
-				if (!matrix[i_root * _vertexCount + j_root]) return false;
+				int rj = _vertexVal->findRoot(j);
+				if (rj != j) continue; // skip non-roots
+
+				if (!matrix[ri * _vertexCount + rj]) return false;
 			}
 		}
+
 		return true;
 	}
 	// checks if the given graph is the complete graph or not
@@ -383,6 +387,37 @@ public:
 			return true;
 	}
 
+	// Removes a specific color from a vertex (if applicable)
+	bool removeColor(int index, long color) {
+		return removeColorHelper<vertex>(index, color);
+	}
+
+	// Overload for std::vector
+	template <class Vector>
+	typename std::enable_if<is_specialization<Vector, std::vector>::value, bool>::type
+		removeColorHelper(int index, long color) {
+		UnionFind<vertex>& unionfind = *_vertexVal;
+		auto& colorList = unionfind[index];
+		auto before = colorList.size();
+
+		colorList.erase(
+			std::remove(colorList.begin(), colorList.end(), color),
+			colorList.end()
+		);
+
+		// Return true if the list changed (color removed)
+		return colorList.size() < before;
+	}
+
+	// (fallback no-op)
+	template <typename vertex_t>
+	typename std::enable_if<!is_specialization<vertex_t, std::vector>::value, bool>::type
+		removeColorHelper(int index, long color) {
+		(void)index;
+		(void)color;
+		return false;
+	}
+
 	int colorIntersectionSize(int index1, int index2) {
 		return colorIntersectionSizeHelper<vertex>(index1, index2);
 	}
@@ -453,7 +488,7 @@ public:
 			this->operator[](index1)[i] |= this->operator[](index2)[i];
 			this->operator[](i)[index1] |= this->operator[](i)[index2];
 
-			(*this)[i][index2] = 0; // remove incoming edges to non root vertex, keeps degree tracking accurate.
+			(*this)[i][index2] = 0; // remove incoming edges from non root vertex, keeps degree tracking accurate.
 		}
 	}
 

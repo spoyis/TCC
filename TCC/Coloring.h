@@ -13,7 +13,8 @@ namespace Coloring {// begin namespace Coloring
 
   enum OptimizationStrategy {
     ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS = 0,
-    VERTICES_WITH_NO_COLOR_INTERSECTION = 1
+    VERTICES_WITH_NO_COLOR_INTERSECTION = 1,
+    ROOT_NODE_SINGLE_CONSTRAINT_PROPAGATION = 2,
   };
 
   template<class graph_t>
@@ -32,7 +33,7 @@ namespace Coloring {// begin namespace Coloring
   public:
     Checker(graph_t* graph, std::vector<std::vector<long>>& roomData) 
       : roomData(graph->getVertexCount()),
-        optimizationStrategies( 2, false )
+        optimizationStrategies( 3, false )
     {
       _originalGraph = graph;
       _initialVertexCount = _bestAnswer = _originalGraph->getVertexCount();
@@ -44,7 +45,7 @@ namespace Coloring {// begin namespace Coloring
 
     Checker(graph_t* graph, std::vector<std::vector<long>>& roomData, std::vector<OptimizationStrategy> strategies)
       : roomData(graph->getVertexCount()),
-        optimizationStrategies(1, false) 
+        optimizationStrategies(3, false) 
     {
       _originalGraph = graph;
       _initialVertexCount = _bestAnswer = _originalGraph->getVertexCount();
@@ -74,6 +75,10 @@ namespace Coloring {// begin namespace Coloring
     ColoringOutput run() {
       if (Validator::naiveCheck<edge, vertex>(*_originalGraph, roomData) == Validator::MISSING_COLORS) _output;
 
+      if (isEnabled(ROOT_NODE_SINGLE_CONSTRAINT_PROPAGATION)) {
+        propagateSingleColorConstraints();
+      }
+
       if (isEnabled(ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS)) {
         sameTimeDifferentRoomsOptimization();
       }
@@ -82,8 +87,9 @@ namespace Coloring {// begin namespace Coloring
         preprocessNonJoinableEdges();
       }
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator> searchQueue;
-      // Create root Zykov
+      // Create root Zykov, ry.
       Zykov* root = new Zykov(_originalGraph->cloneHeap(), _initialVertexCount, this);
+      contractUnitIntersectionSingles(root);
       searchQueue.push(root);
       long long step = 0;
       const int BATCH_SIZE = 10;
@@ -155,15 +161,15 @@ namespace Coloring {// begin namespace Coloring
               // Currently does nothing
               // IMPORTANT: THIS SHOULD KILL THE WHOLE CHECKER TREE
               // wasnt fully implemented because this block never actually ran
-              std::cout << "HOLY SHIT!!!!\n";
-              std::cout << "HOLY SHIT!!!!\n";
-              std::cout << "HOLY SHIT!!!!\n";
-              std::cout << "HOLY SHIT!!!!\n";
-              std::cout << "HOLY SHIT!!!!\n";
-              std::cout << "HOLY SHIT!!!!\n";
-              std::cout << "HOLY SHIT!!!!\n";
-              std::cout << "HOLY SHIT!!!!\n";
-              std::cout << "HOLY SHIT!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!\n";
+              std::cout << "THIS INSTANCE IS INVALID!!!!\n";
               break;
             }
             std::cout << "RECURSION RESULTED IN A SUCCESS" << '\n';
@@ -212,7 +218,7 @@ namespace Coloring {// begin namespace Coloring
     Graph<edge, vertex>* _originalGraph;
     Heuristic::Enums strategy{ Heuristic::STRATEGY_DEFAULT };
     Heuristic::Enums eval{ Heuristic::EVAL_DEFAULT };
-    std::vector<bool> optimizationStrategies{false, false};
+    std::vector<bool> optimizationStrategies{false, false, false};
     std::vector<std::vector<long>> roomData;
     
     // Statistics
@@ -323,6 +329,87 @@ namespace Coloring {// begin namespace Coloring
           << optimizationCounter << " edges.\n";
       }
     }
+
+    void contractUnitIntersectionSingles(Zykov*& zykovRoot) {
+      bool changed = true;
+      long counter = 0;
+      while (changed) {
+        changed = false;
+        Graph<edge, vertex>& g = *zykovRoot->getGraph();
+        const long n = g.getVertexCount();
+
+        for (long i = 0; i < n; ++i) {
+          long ri = g.getRoot(i);
+          if (ri != i) continue;
+
+          auto& Li = g.getVertexData(ri);
+          if (Li.size() != 1) continue;
+
+          for (long j = i + 1; j < n; ++j) {
+            long rj = g.getRoot(j);
+            if (rj != j || ri == rj || g[ri][rj]) continue;
+
+            auto& Lj = g.getVertexData(rj);
+            if (Lj.size() != 1) continue;
+
+            if (Li[0] == Lj[0]) {
+              // Create a new contracted node
+              std::pair<long, long> vertices = { ri, rj };
+              // Contracting vertices outside of zykov constructor simply breaks everything, and I... just cannot tell why, sorry :D
+              Zykov* contractChild = new Zykov(*g.cloneHeap(), vertices, zykovRoot);
+
+              // Destroy the old root to free its graph
+              delete zykovRoot;
+
+              // Replace root with the contracted version
+              zykovRoot = contractChild;
+              changed = true;
+              counter++;
+              break;
+            }
+          }
+          if (changed) break;
+        }
+      }
+
+      std::cout << "[PREPROCESS][SINGLEINTERSECTION] Propagated "<< counter  <<  " vertex joinings.\n"; 
+    }
+
+
+
+    void propagateSingleColorConstraints() {
+      Graph<edge, vertex>& graph = *_originalGraph;
+      long vertexCount = graph.getVertexCount();
+      bool changed = true;
+      long propagationCounter = 0;
+
+      while (changed) {
+        changed = false;
+
+        for (long i = 0; i < vertexCount; i++) {
+          auto& colors = graph.getVertexData(i);
+          if (colors.size() == 1) {
+            auto fixedColor = colors.front();
+
+            for (long j = 0; j < vertexCount; j++) {
+              if (i == j || !graph[i][j]) continue;
+
+              if (graph.removeColor(j, fixedColor)) {
+                propagationCounter++;
+                changed = true;
+              }
+            }
+          }
+        }
+      }
+
+      if (propagationCounter != 0) {
+        std::cout << "[PREPROCESS][SINGLECOLOR] Propagated "
+          << propagationCounter
+          << " color removals.\n";
+      }
+    }
+
 
     Checker<graph_t> createRecursiveInstance(Zykov* node) {
       std::vector<long> vertices = node->getJoinedVerticesFromClique(node->getBadClique());
@@ -660,7 +747,7 @@ namespace Coloring {// begin namespace Coloring
       
       
       // this returns {-1, -1} if no valid vertex pair is found
-      auto nonNeighboringVertices = heuristic(*_graph, eval, largestClique, _rightmostVertexIndex, _currentVertexCount);
+      auto nonNeighboringVertices = heuristic(*_graph, eval, _checkerPtr->roomData, largestClique, _rightmostVertexIndex, _currentVertexCount);
       //std::cout << "SELECTED " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
       // If no valid vertex pair found, check if complete
       if (nonNeighboringVertices.first == -1) {
@@ -755,6 +842,7 @@ namespace Coloring {// begin namespace Coloring
       _lastOperation = "added edge between " + std::to_string(vertices.first) + " and " + std::to_string(vertices.second);
     }
 
+    public:
     // contract vertices constructor
     Zykov(Graph<edge, vertex>& g, std::pair<long, long> vertices, Zykov* parent) {
       _graph = g.cloneHeap();
