@@ -10,6 +10,7 @@
 extern OutputWriter out;
 
 long globalCounter = 0;
+constexpr double MAX_RUNTIME_SECONDS = 120.0; // 2 minutes
 
 namespace Coloring {// begin namespace Coloring
 
@@ -75,11 +76,13 @@ namespace Coloring {// begin namespace Coloring
     }
 
     ColoringOutput run() {
+
       out.originalGraph.vertex_count = _originalGraph->getVertexCount();
       out.originalGraph.edge_count = _originalGraph->getEdgeCount();
       out.colors = -1;
       if (Validator::naiveCheck<edge, vertex>(*_originalGraph, roomData) == Validator::MISSING_COLORS) _output;
 
+      auto startTime = std::chrono::steady_clock::now();
       if (isEnabled(ROOT_NODE_SINGLE_CONSTRAINT_PROPAGATION)) {
         propagateSingleColorConstraints();
       }
@@ -109,6 +112,34 @@ namespace Coloring {// begin namespace Coloring
       const int BATCH_SIZE = 10;
 
       while (!searchQueue.empty()) {
+        auto now = std::chrono::steady_clock::now();
+        double elapsedSeconds =
+          std::chrono::duration<double>(now - startTime).count();
+
+        if (elapsedSeconds >= MAX_RUNTIME_SECONDS) {
+          std::cout << "\n[TIMEOUT] Maximum runtime of "
+            << MAX_RUNTIME_SECONDS << " seconds reached.\n";
+          std::cout << "[TIMEOUT] Terminating search gracefully.\n";
+
+          // record partial results
+          out.exploredVertices = nodesExplored;
+          out.prunedTimeslot =
+            processedNodeStatistics[Validator::INVALID_TIMESLOT_COLORING] +
+            processedNodeStatistics[Validator::INVALID_TIMESLOT_PIGEONHOLE];
+          out.prunedRooms =
+            processedNodeStatistics[Validator::INVALID_ROOM_COLORING] +
+            processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE];
+
+
+          // cleanup 
+          while (!searchQueue.empty()) {
+            delete searchQueue.top();
+            searchQueue.pop();
+          }
+
+          return _output; 
+        }
+
         if (hasSolution) {
           break;
         }
@@ -307,6 +338,7 @@ namespace Coloring {// begin namespace Coloring
         }
       }
 
+      long counter = 0;
       for (auto& vertexPair : nonNeighbors) {
         auto v1 = vertexPair.first;
         auto v2 = vertexPair.second;
@@ -315,10 +347,15 @@ namespace Coloring {// begin namespace Coloring
           graph[v1][v2] = {1};
           graph[v2][v1] = {1};
 
-          std::cout << "[OPTIMIZING] CLASS " << graph.getVertexLabel(v1) << " AND " << graph.getVertexLabel(v2) << " SHARE THE SAME ONE ROOM\n";
+          counter++;
+          //std::cout << "[OPTIMIZING] CLASS " << graph.getVertexLabel(v1) << " AND " << graph.getVertexLabel(v2) << " SHARE THE SAME ONE ROOM\n";
           //std::cout << "[DEBUG] Added edge between " << v1 << " and " << v2 << std::endl;
+
         }
       }
+
+      std::cout << "[PREPROCESS][DIFFERENTROOMSSAMETIME] created " << counter << " edges.\n";
+
     }
 
     void preprocessNonJoinableEdges() {

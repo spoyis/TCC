@@ -6,8 +6,7 @@
 #include <vector>
 #include <random>
 
-std::random_device rd;
-std::mt19937 gen(rd());  // RNG
+extern std::mt19937 gen;
 
 template <typename edge, typename vertex>
 class Graph { // begin class Graph
