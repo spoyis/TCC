@@ -6,8 +6,8 @@
 #include <vector>
 #include <random>
 
-
-std::mt19937 gen(5489); // RNG
+std::random_device rd;
+std::mt19937 gen(rd());  // RNG
 
 template <typename edge, typename vertex>
 class Graph { // begin class Graph

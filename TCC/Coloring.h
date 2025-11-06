@@ -6,6 +6,8 @@
 #include "ColoringOutput.h"
 #include "validator.h"
 #include <stdexcept>
+#include "OutputWriter.h"
+extern OutputWriter out;
 
 long globalCounter = 0;
 
@@ -73,6 +75,9 @@ namespace Coloring {// begin namespace Coloring
     }
 
     ColoringOutput run() {
+      out.originalGraph.vertex_count = _originalGraph->getVertexCount();
+      out.originalGraph.edge_count = _originalGraph->getEdgeCount();
+      out.colors = -1;
       if (Validator::naiveCheck<edge, vertex>(*_originalGraph, roomData) == Validator::MISSING_COLORS) _output;
 
       if (isEnabled(ROOT_NODE_SINGLE_CONSTRAINT_PROPAGATION)) {
@@ -89,7 +94,16 @@ namespace Coloring {// begin namespace Coloring
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator> searchQueue;
       // Create root Zykov, ry.
       Zykov* root = new Zykov(_originalGraph->cloneHeap(), _initialVertexCount, this);
-      contractUnitIntersectionSingles(root);
+      auto contracted = contractUnitIntersectionSingles(root);
+
+
+      { // get data for output
+        graph_t* preG = root->getGraph();
+        out.preProcessedGraph.vertex_count = preG->getVertexCount() - contracted;
+        out.preProcessedGraph.edge_count = preG->getEdgeCount();
+      }
+
+
       searchQueue.push(root);
       long long step = 0;
       const int BATCH_SIZE = 10;
@@ -189,6 +203,17 @@ namespace Coloring {// begin namespace Coloring
         delete searchQueue.top();
         searchQueue.pop();
       }
+
+
+      out.exploredVertices = nodesExplored;
+
+      out.prunedTimeslot =
+        processedNodeStatistics[Validator::INVALID_TIMESLOT_COLORING] +
+        processedNodeStatistics[Validator::INVALID_TIMESLOT_PIGEONHOLE];
+
+      out.prunedRooms =
+        processedNodeStatistics[Validator::INVALID_ROOM_COLORING] +
+        processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE];
 
       return _output;
     }
@@ -330,7 +355,7 @@ namespace Coloring {// begin namespace Coloring
       }
     }
 
-    void contractUnitIntersectionSingles(Zykov*& zykovRoot) {
+    long contractUnitIntersectionSingles(Zykov*& zykovRoot) {
       bool changed = true;
       long counter = 0;
       while (changed) {
@@ -373,6 +398,7 @@ namespace Coloring {// begin namespace Coloring
       }
 
       std::cout << "[PREPROCESS][SINGLEINTERSECTION] Propagated "<< counter  <<  " vertex joinings.\n"; 
+      return counter;
     }
 
 
@@ -552,6 +578,8 @@ namespace Coloring {// begin namespace Coloring
       std::cout << "Lower bound: " << leafNode->getLowerBound() << "\n";
       std::cout << "Upper bound: " << leafNode->getUpperBound() << "\n";
       std::cout << "-------------------------\n";
+
+      out.colors = leafNode->getUpperBound();
 
       std::vector<long> roots = graph.findCliqueRandom();
       // containers for coloring data
