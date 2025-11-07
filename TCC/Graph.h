@@ -90,8 +90,8 @@ public:
 
 	void updateDegree(int i, int j, edge oldValue, edge newValue) {
 		if (this->getRoot(i) != i) {
-			std::cout << "[DEGREE SKIP] Non-root vertex " << i << '\n';
-			return; // only root vertices count
+			//std::cout << "[DEGREE SKIP] Non-root vertex " << i << '\n';
+			//return; // only root vertices count
 		}
 
 		if (i == j) {
@@ -158,6 +158,7 @@ public:
 		return _vertexVal->operator[](index);
 	}
 
+	// returns size of adjacency matrix, not necessarily the vertex count... I know... bad name
 	auto getVertexCount() { return _vertexCount; };
 
 	std::string getVertexLabel(int index) { return (*_vertexLabels)[index]; }
@@ -191,8 +192,8 @@ public:
 		//if (root1 == root2) std::cout << "you're trying to join a vertex thats already been joined, you sure?\n";
 
 		_vertexVal->unionOp(root1, root2);
-		joinEdgeData(std::min(index1, index2), std::max(index1, index2));
-		joinVertexData(std::min(index1, index2), std::max(index1, index2));
+		joinEdgeData(std::min(root1, root2), std::max(root1, root2));
+		joinVertexData(std::min(root1, root2), std::max(root1, root2));
 	}
 
 
@@ -475,7 +476,7 @@ public:
 	template<typename vertex_t>
 	typename std::enable_if<!is_specialization<vertex_t, std::vector>::value>::type
 	joinVertexDataHelper(const vertex_t& v1, const vertex_t&v2) {
-		std::cout << "Given type is not an std::vector... method not implemented lol (ignore this line)" << std::endl;
+		//std::cout << "Given type is not an std::vector... method not implemented (ignore this line)" << std::endl;
 	}
 	// END JOINVERTEXDATA METHODS 
 
@@ -484,10 +485,22 @@ public:
 			auto rootI = this->getRoot(i);
 			if (i != rootI) continue;
 
+			if (i == index1 || i == index2) continue; // avoid self-loop propagation
+
 			this->operator[](index1)[i] |= this->operator[](index2)[i];
 			this->operator[](i)[index1] |= this->operator[](i)[index2];
 
-			(*this)[i][index2] = 0; // remove incoming edges from non root vertex, keeps degree tracking accurate.
+			(*this)[i][index2] = 0;
+			(*this)[index2][i] = 0;
+		}
+
+		// explicitly clear diagonals
+		(*this)[index1][index1] = 0;
+		(*this)[index2][index2] = 0;
+
+		for (long j = 0; j < _vertexCount; ++j) {
+			(*this)[index2][j] = 0;
+			(*this)[j][index2] = 0;
 		}
 	}
 

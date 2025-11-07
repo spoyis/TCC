@@ -9,25 +9,52 @@
 #include <chrono>
 #include <iostream>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 std::mt19937 gen;
 OutputWriter out;
 unsigned long long GLOBAL_SEED = 0;
 
 int main(int argc, char* argv[]) {
-  if (argc < 3) {
-    std::cerr << "Usage: " << argv[0] << " <inputfile> <outputfile>\n";
-    return 1;
+  TestSuite::run<int>("int");
+  std::string inputFile;
+  std::string outputFile;
+
+  if (argc >= 3) {
+    inputFile = argv[1];
+    outputFile = argv[2];
+  }
+  else {
+
+    bool underDebugger = false;
+    #ifdef _WIN32
+        underDebugger = (IsDebuggerPresent() != 0);
+    #endif
+
+    if (underDebugger) {
+      // Defaults to use while debugging in Visual Studio
+      inputFile = "2025-1.txt";
+      outputFile = "2025-1-debug-output.txt";
+      std::cout << "[DEBUG MODE] No args supplied - using defaults:\n"
+        << "  input:  " << inputFile << "\n"
+        << "  output: " << outputFile << "\n";
+    }
+    else {
+      std::cerr << "Usage: " << argv[0] << " <inputfile> <outputfile>\n";
+      return 1;
+    }
   }
 
+
   std::random_device rd;
-  GLOBAL_SEED = rd();
+  GLOBAL_SEED = 1287245168;
   gen.seed(GLOBAL_SEED);
   out.seed = GLOBAL_SEED;
 
   std::cout << "Random seed: " << GLOBAL_SEED << "\n";
 
-  std::string inputFile = argv[1];
-  std::string outputFile = argv[2];
 
   try {
     std::cout << "BEGIN PARSING INPUT: " << inputFile << "\n";

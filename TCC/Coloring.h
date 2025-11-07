@@ -393,11 +393,12 @@ namespace Coloring {// begin namespace Coloring
     }
 
     long contractUnitIntersectionSingles(Zykov*& zykovRoot) {
+      Graph<edge, vertex>& g = *zykovRoot->getGraph();
       bool changed = true;
       long counter = 0;
+
       while (changed) {
         changed = false;
-        Graph<edge, vertex>& g = *zykovRoot->getGraph();
         const long n = g.getVertexCount();
 
         for (long i = 0; i < n; ++i) {
@@ -415,18 +416,9 @@ namespace Coloring {// begin namespace Coloring
             if (Lj.size() != 1) continue;
 
             if (Li[0] == Lj[0]) {
-              // Create a new contracted node
-              std::pair<long, long> vertices = { ri, rj };
-              // Contracting vertices outside of zykov constructor simply breaks everything, and I... just cannot tell why, sorry :D
-              Zykov* contractChild = new Zykov(*g.cloneHeap(), vertices, zykovRoot);
-
-              // Destroy the old root to free its graph
-              delete zykovRoot;
-
-              // Replace root with the contracted version
-              zykovRoot = contractChild;
-              changed = true;
+              g.joinVertices(ri, rj);
               counter++;
+              changed = true;
               break;
             }
           }
@@ -434,9 +426,13 @@ namespace Coloring {// begin namespace Coloring
         }
       }
 
-      std::cout << "[PREPROCESS][SINGLEINTERSECTION] Propagated "<< counter  <<  " vertex joinings.\n"; 
+      zykovRoot->setVertexCount(g.getVertexCount() - counter);
+
+      std::cout << "[PREPROCESS][SINGLEINTERSECTION] Propagated "
+        << counter << " vertex joinings.\n";
       return counter;
     }
+
 
 
 
@@ -722,6 +718,7 @@ namespace Coloring {// begin namespace Coloring
     long getNodeDepth() const { return _depth; }
     Graph<edge, vertex>* getGraph() const { return _graph; }
     std::string getVertexLabel(long index) const { return _graph->getVertexLabel(index); }
+    void setVertexCount(long count) { _currentVertexCount = count; } // used only in Checker::contractUnitIntersectionSingles
 
     std::vector<long> getJoinedVerticesFromClique(const  std::vector<long>& clique) {
       std::vector<long> output(clique);
@@ -907,7 +904,7 @@ namespace Coloring {// begin namespace Coloring
       _lastOperation = "added edge between " + std::to_string(vertices.first) + " and " + std::to_string(vertices.second);
     }
 
-    public:
+
     // contract vertices constructor
     Zykov(Graph<edge, vertex>& g, std::pair<long, long> vertices, Zykov* parent) {
       _graph = g.cloneHeap();
