@@ -51,12 +51,18 @@
     <ClInclude Include="ColoringOutput.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
+    <ClInclude Include="DebuggingFunctions.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
     <ClCompile Include="OutputWriter.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClCompile>
+    <ClCompile Include="PreProcessing.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClCompile>
   </ItemGroup>

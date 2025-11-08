@@ -7,10 +7,13 @@
 #include "validator.h"
 #include <stdexcept>
 #include "OutputWriter.h"
+#include "DebuggingFunctions.h"
+#include "PreProcessing.h"
+
 extern OutputWriter out;
 
 long globalCounter = 0;
-constexpr double MAX_RUNTIME_SECONDS = 120.0; // 2 minutes
+constexpr double MAX_RUNTIME_SECONDS = 120.0; 
 
 namespace Coloring {// begin namespace Coloring
 
@@ -33,6 +36,10 @@ namespace Coloring {// begin namespace Coloring
     enum PruneMotive {
       not_pruned, bad_clique_contraction, no_valid_intermediate_coloring, no_valid_final_coloring
     };
+
+    template <typename graph_t>
+    friend long Optimization::contractUnitIntersectionSingles(typename Checker<graph_t>::Zykov* zykovRoot);
+
   public:
     Checker(graph_t* graph, std::vector<std::vector<long>>& roomData) 
       : roomData(graph->getVertexCount()),
@@ -84,21 +91,21 @@ namespace Coloring {// begin namespace Coloring
 
       auto startTime = std::chrono::steady_clock::now();
       if (isEnabled(ROOT_NODE_SINGLE_CONSTRAINT_PROPAGATION)) {
-        propagateSingleColorConstraints();
+        Optimization::propagateSingleColorConstraints(_originalGraph);
       }
 
       if (isEnabled(ROOT_NODE_SAME_TIME_DIFFERENT_ROOMS)) {
-        sameTimeDifferentRoomsOptimization();
+        Optimization::sameTimeDifferentRoomsOptimization(_originalGraph, this->roomData);
       }
 
       if (isEnabled(VERTICES_WITH_NO_COLOR_INTERSECTION)) {
-        preprocessNonJoinableEdges();
+        Optimization::preprocessNonJoinableEdges(_originalGraph);
       }
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator> searchQueue;
       // Create root Zykov, ry.
       Zykov* root = new Zykov(_originalGraph->cloneHeap(), _initialVertexCount, this);
-      auto contracted = contractUnitIntersectionSingles(root);
-
+      auto contracted = Optimization::contractUnitIntersectionSingles<graph_t>(root);
+      
 
       { // get data for output
         graph_t* preG = root->getGraph();
@@ -324,151 +331,6 @@ namespace Coloring {// begin namespace Coloring
       return (_areRecursiveChecksEnabled || _areBadCliqueCleanupsEnabled) && extraValidationStepCounter >= 100 && _isRootChecker;
     }
 
-    void sameTimeDifferentRoomsOptimization() {
-      std::vector<std::pair<long, long>> nonNeighbors;
-      Graph<edge, vertex>& graph = *_originalGraph;
-
-      for (long i = 0; i < _initialVertexCount; i++)
-      {
-        for (long j = 0; j < _initialVertexCount; j++) {
-          if (i == j) continue;
-          if (roomData[i].size() > 1 || roomData[j].size() > 1) continue;
-
-          if (!graph[i][j]) nonNeighbors.push_back({ i,j });
-        }
-      }
-
-      long counter = 0;
-      for (auto& vertexPair : nonNeighbors) {
-        auto v1 = vertexPair.first;
-        auto v2 = vertexPair.second;
-
-        if (roomData[v1][0] == roomData[v2][0]) {
-          graph[v1][v2] = {1};
-          graph[v2][v1] = {1};
-
-          counter++;
-          //std::cout << "[OPTIMIZING] CLASS " << graph.getVertexLabel(v1) << " AND " << graph.getVertexLabel(v2) << " SHARE THE SAME ONE ROOM\n";
-          //std::cout << "[DEBUG] Added edge between " << v1 << " and " << v2 << std::endl;
-
-        }
-      }
-
-      std::cout << "[PREPROCESS][DIFFERENTROOMSSAMETIME] created " << counter << " edges.\n";
-
-    }
-
-    void preprocessNonJoinableEdges() {
-      Graph<edge, vertex>& graph = *_originalGraph;
-      long vertexCount = graph.getVertexCount();
-      std::vector<std::pair<long, long>> nonNeighbors;
-
-      // collect all non-adjacent vertex pairs
-      for (long i = 0; i < vertexCount; i++) {
-        long rootI = graph.getRoot(i);
-        if (rootI < i) continue;
-
-        for (long j = 0; j < vertexCount; j++) {
-          long rootJ = graph.getRoot(j);
-          if (rootJ < j) continue;
-          if (i != j && !graph[rootI][rootJ]) {
-            nonNeighbors.emplace_back(i, j);
-          }
-        }
-      }
-
-      long optimizationCounter = 0;
-      for (auto& [v1, v2] : nonNeighbors) {
-        if (!graph.areJoinable(v1, v2)) {
-          graph[v1][v2] = { 1 };
-          graph[v2][v1] = { 1 };
-          optimizationCounter++;
-        }
-      }
-
-      if (optimizationCounter != 0) {
-        std::cout << "[PREPROCESS][NON_JOINABLE] Added "
-          << optimizationCounter << " edges.\n";
-      }
-    }
-
-    long contractUnitIntersectionSingles(Zykov*& zykovRoot) {
-      Graph<edge, vertex>& g = *zykovRoot->getGraph();
-      bool changed = true;
-      long counter = 0;
-
-      while (changed) {
-        changed = false;
-        const long n = g.getVertexCount();
-
-        for (long i = 0; i < n; ++i) {
-          long ri = g.getRoot(i);
-          if (ri != i) continue;
-
-          auto& Li = g.getVertexData(ri);
-          if (Li.size() != 1) continue;
-
-          for (long j = i + 1; j < n; ++j) {
-            long rj = g.getRoot(j);
-            if (rj != j || ri == rj || g[ri][rj]) continue;
-
-            auto& Lj = g.getVertexData(rj);
-            if (Lj.size() != 1) continue;
-
-            if (Li[0] == Lj[0]) {
-              g.joinVertices(ri, rj);
-              counter++;
-              changed = true;
-              break;
-            }
-          }
-          if (changed) break;
-        }
-      }
-
-      zykovRoot->setVertexCount(g.getVertexCount() - counter);
-
-      std::cout << "[PREPROCESS][SINGLEINTERSECTION] Propagated "
-        << counter << " vertex joinings.\n";
-      return counter;
-    }
-
-
-
-
-    void propagateSingleColorConstraints() {
-      Graph<edge, vertex>& graph = *_originalGraph;
-      long vertexCount = graph.getVertexCount();
-      bool changed = true;
-      long propagationCounter = 0;
-
-      while (changed) {
-        changed = false;
-
-        for (long i = 0; i < vertexCount; i++) {
-          auto& colors = graph.getVertexData(i);
-          if (colors.size() == 1) {
-            auto fixedColor = colors.front();
-
-            for (long j = 0; j < vertexCount; j++) {
-              if (i == j || !graph[i][j]) continue;
-
-              if (graph.removeColor(j, fixedColor)) {
-                propagationCounter++;
-                changed = true;
-              }
-            }
-          }
-        }
-      }
-
-      if (propagationCounter != 0) {
-        std::cout << "[PREPROCESS][SINGLECOLOR] Propagated "
-          << propagationCounter
-          << " color removals.\n";
-      }
-    }
-
 
     Checker<graph_t> createRecursiveInstance(Zykov* node) {
       std::vector<long> vertices = node->getJoinedVerticesFromClique(node->getBadClique());
@@ -596,6 +458,11 @@ namespace Coloring {// begin namespace Coloring
       std::cout << "[CLEANUP] Removed "
         << removed
         << " nodes with duplicate bad clique\n";
+
+      //for (auto node : badClique) {
+        //std::cout << "BAD CLIQUE VERTEX: " << badGraph.getVertexLabel(node) <<  " " << node << '\n';
+     // }
+
     }
 
     void writeSolution(Zykov* leafNode) {
@@ -718,7 +585,7 @@ namespace Coloring {// begin namespace Coloring
     long getNodeDepth() const { return _depth; }
     Graph<edge, vertex>* getGraph() const { return _graph; }
     std::string getVertexLabel(long index) const { return _graph->getVertexLabel(index); }
-    void setVertexCount(long count) { _currentVertexCount = count; } // used only in Checker::contractUnitIntersectionSingles
+    void setVertexCount(long count) { _currentVertexCount = count; std::cout << "SET TO " << count << '\n'; } // used only in Checker::contractUnitIntersectionSingles
 
     std::vector<long> getJoinedVerticesFromClique(const  std::vector<long>& clique) {
       std::vector<long> output(clique);
@@ -748,29 +615,29 @@ namespace Coloring {// begin namespace Coloring
       int edgesAdded = 0;
 
       // Iterate over all pairs of vertices outside the clique
-      for (long x = 0; x < n; ++x) {
-        auto rootX = graph.getRoot(x);
+      auto& roots = graph.getRoots();
+      for (long x = 0; x < roots.size(); ++x) {
+        auto rootX = roots[x];
         if (std::find(clique.begin(), clique.end(), rootX) != clique.end()) continue; // skip if in clique
-        if (rootX != x) continue; // skip if not a root
 
-        for (long y = x + 1; y < n; ++y) {
-          auto rootY = graph.getRoot(y);
+        for (long y = x + 1; y < roots.size(); ++y) {
+          auto rootY = roots[y];
+          if (graph[rootX][rootY]) continue; // skip existing edges
           if (std::find(clique.begin(), clique.end(), rootY) != clique.end()) continue;
-          if (rootY != y) continue; // skip if not a root
-          if (graph[x][y]) continue; // skip existing edges
+          
 
           // Check if every vertex in clique is adjacent to at least one of x or y
           bool allCovered = true;
           for (auto z : clique) {
-            if (!graph[x][z] && !graph[y][z]) {
+            if (!graph[rootX][z] && !graph[rootY][z]) {
               allCovered = false;
               break;
             }
           }
 
           if (allCovered) {
-            graph[x][y] = edge{ 1 };
-            graph[y][x] = edge{ 1 };
+            graph[rootX][rootY] = edge{ 1 };
+            graph[rootY][rootX] = edge{ 1 };
             edgesAdded++;
           }
         }
@@ -782,6 +649,10 @@ namespace Coloring {// begin namespace Coloring
       Heuristic::strategy<edge, vertex> heuristic,
       Heuristic::eval<edge> eval,
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator>& searchQueue) {
+
+      //std::vector<long>TEST({ 265,215,1,214,282,18,3 });
+      //std::cout << "IS TEST A CLIQUE?" << isThisAClique(TEST, this->_graph) << '\n';
+      //std::cout << "EXPLORING NODE! " << this->_lastOperation << " AT DEPTH: " << this->_depth << '\n';
       
       // Validate multiple random cliques for more aggressive pruning
       const int NUM_CLIQUES_TO_VALIDATE = 5;
@@ -793,6 +664,7 @@ namespace Coloring {// begin namespace Coloring
         auto cliqueValidation = Validator::clique<edge, vertex>(clique, *_graph, _checkerPtr->roomData);
 
         if (cliqueValidation != Validator::VALID) {
+          //std::cout << "THIS NODE IS BAD!\n";
           // If any clique is invalid, we can prune this node
           if (saveBadCliques) {
             badClique = clique;
@@ -879,7 +751,7 @@ namespace Coloring {// begin namespace Coloring
       }
 
       _upperBound = maxDegree + 1; // degree-based upper bound
-
+      
       double V = static_cast<double>(_currentVertexCount);
       double E = static_cast<double>(graph.getEdgeCount());
       _graphDensity = E / (V * (V - 1));

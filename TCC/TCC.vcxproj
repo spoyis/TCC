@@ -136,6 +136,7 @@
     <ClInclude Include="BipartiteMatching.h" />
     <ClInclude Include="Coloring.h" />
     <ClInclude Include="ColoringOutput.h" />
+    <ClInclude Include="DebuggingFunctions.h" />
     <ClInclude Include="DIMACS.h" />
     <ClInclude Include="Graph.h" />
     <ClInclude Include="Heuristics.h" />
@@ -148,6 +149,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="OutputWriter.h" />
+    <ClCompile Include="PreProcessing.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

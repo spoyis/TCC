@@ -1,5 +1,5 @@
 #pragma once
-#include <vector>
+#include <array>
 
 namespace Coloring{
   struct ColoringOutput {
@@ -15,8 +15,8 @@ namespace Coloring{
     status solutionStatus;
   };
 
-  constexpr ColoringOutput DEFAULT_NO_SOLUTION = {
+  inline const ColoringOutput DEFAULT_NO_SOLUTION = {
       {},
       ColoringOutput::NO_SOLUTION
-};
+  };
 }

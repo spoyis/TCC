@@ -26,6 +26,10 @@ public:
 		_vertexLabels = std::make_shared<std::vector<std::string>>(n);
 		_vertexCount = n;
 		degrees = std::vector<long>(n);
+		roots = std::vector<long>(n);
+
+		for (long i = 0; i < n; ++i)
+			roots[i] = i;
 	}
 
 	// Move constructor
@@ -36,6 +40,7 @@ public:
 		this->_vertexCount = other._vertexCount;
 		this->_vertexLabels = std::move(other._vertexLabels);
 		degrees = std::move(other.degrees);
+		roots = std::move(other.roots);
 
 		other.adjMatrix = nullptr;
 		other._vertexVal = nullptr;
@@ -52,6 +57,7 @@ public:
 		this->_vertexCount = other._vertexCount;
 		this->_vertexLabels = std::move(other._vertexLabels);
 		degrees = std::move(other.degrees);
+		roots = std::move(other.roots);
 
 		adjMatrix->graphObj = this;
 		other.adjMatrix = nullptr;
@@ -158,6 +164,10 @@ public:
 		return _vertexVal->operator[](index);
 	}
 
+	const std::vector<long>& getRoots() const {
+		return roots;
+	}
+
 	// returns size of adjacency matrix, not necessarily the vertex count... I know... bad name
 	auto getVertexCount() { return _vertexCount; };
 
@@ -194,6 +204,15 @@ public:
 		_vertexVal->unionOp(root1, root2);
 		joinEdgeData(std::min(root1, root2), std::max(root1, root2));
 		joinVertexData(std::min(root1, root2), std::max(root1, root2));
+		refreshRoots();
+	}
+
+	void refreshRoots() {
+		roots.clear();
+		for (long i = 0; i < _vertexCount; ++i) {
+			if (_vertexVal->findRoot(i) == i)
+				roots.push_back(i);
+		}
 	}
 
 
@@ -233,10 +252,10 @@ public:
 
 			// Candidate set = all root vertices not in clique
 			std::vector<int> candidates;
-			for (int i = 0; i < _vertexCount; i++) {
-				int root = getRoot(i);
-			if (std::find(clique.begin(), clique.end(), i) == clique.end() && root == i) {
-					candidates.push_back(i);
+			candidates.reserve(roots.size());
+			for (int r : roots) {
+				if (std::find(clique.begin(), clique.end(), r) == clique.end()) {
+					candidates.push_back(r);
 				}
 			}
 
@@ -519,6 +538,7 @@ private:
 	int _vertexCount;
 	std::shared_ptr<std::vector<std::string>> _vertexLabels;
 	std::vector<long>degrees;
+	std::vector<long> roots;
 
 
 protected:
@@ -530,6 +550,7 @@ protected:
 		_vertexVal = other._vertexVal->clone();
 		degrees = other.degrees;
 		_vertexLabels = other._vertexLabels;
+		roots = other.roots;
 		//adjMatrix->graphObj = this;
 	}
 }; // end class Graph
