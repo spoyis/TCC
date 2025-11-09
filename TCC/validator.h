@@ -304,6 +304,62 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
     return true;
   }
 
+  template <typename edge, typename vertex>
+  bool canJoinBasedOnRoomConstraint(
+    long v1, long v2, 
+    Graph<edge, vertex>& g, 
+    const std::vector<std::vector<long>>& roomData
+  ) {
+    long r1 = g.getRoot(v1);
+    long r2 = g.getRoot(v2);
+
+    if (r1 == r2) return true; // already joined...
+    if (g[r1][r2]) return false; // already adjacent...
+
+    std::vector<long> vertexList;
+    long vertexCount = g.getVertexCount();
+
+    for (long i = 0; i < vertexCount; i++) {
+      auto vertexRoot = g.getRoot(i);
+      if (vertexRoot == r1 || vertexRoot == r2)
+        vertexList.push_back(i);
+    }
+
+    std::set<long> joinedRoomsSet;
+    for (auto v : vertexList) {
+      for (auto room : roomData[v]) {
+        joinedRoomsSet.insert(room);
+      }
+    }
+
+    std::vector<long> joinedRooms(joinedRoomsSet.begin(), joinedRoomsSet.end());
+    // pigeonhole violation — not enough unique rooms for distinct classes
+    if (joinedRooms.size() < vertexList.size()) {
+      return false;
+    }
+
+    // bipartite matching similar to joined clique vertex checking above
+    BipartiteMatching roomValidation(vertexList.size(), joinedRooms.size());
+
+    for (long v = 0; v < vertexList.size(); v++) {
+      // we know what colors(rooms) 'v' accepts, but we need to map its indexes to be the same as roomData indexed them.
+      auto& colorArray = roomData[vertexList[v]];
+      roomValidation.defineInitialCapacity(v, 1);
+
+      for (auto color : colorArray) {
+        for (long c = 0; c < joinedRooms.size(); c++) {
+          if (color == joinedRooms[c]) {
+            roomValidation.addEdge(v, c);
+            break;
+          }
+        }
+      }
+    }
+
+    long roomValidationOutput = roomValidation.solve();
+    return roomValidationOutput == vertexList.size();
+  }
+
   // quickly checks if any vertices are missing colors, immediately invalidating the whole instance
   // this is used only on the root vertex of a Checker instance.
   template<typename edge, typename vertex>

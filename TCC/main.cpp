@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
 
 
   std::random_device rd;
-  GLOBAL_SEED =  1287245168;  /// THIS IS THE SHORTEST BAD ONE !!! 498191348 <--- need to mess up the heuristic function
+  GLOBAL_SEED = rd();  /// THIS IS THE SHORTEST BAD ONE !!! 498191348 <--- need to mess up the heuristic function
   gen.seed(GLOBAL_SEED);
   out.seed = GLOBAL_SEED;
 

@@ -17,7 +17,8 @@ struct OutputWriter {
   long exploredVertices;
   long prunedTimeslot;
   long prunedRooms;
-  unsigned long long seed; 
+  long badCliqueCallback;
+  unsigned long long seed;
 
   void writeToFile(const std::string& outputName) const {
     std::ofstream out(outputName);
@@ -34,6 +35,7 @@ struct OutputWriter {
       << exploredVertices << "\n"
       << prunedTimeslot << "\n"
       << prunedRooms << "\n"
+      << badCliqueCallback << "\n"
       << seed << "\n";  
 
     out.close();

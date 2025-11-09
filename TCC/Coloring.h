@@ -3,6 +3,7 @@
 #include "Graph.h"
 #include "BipartiteMatching.h"
 #include <queue>
+#include <set>
 #include "ColoringOutput.h"
 #include "validator.h"
 #include <stdexcept>
@@ -38,7 +39,7 @@ namespace Coloring {// begin namespace Coloring
     };
 
     template <typename graph_t>
-    friend long Optimization::contractUnitIntersectionSingles(typename Checker<graph_t>::Zykov* zykovRoot);
+    friend long Optimization::contractUnitIntersectionSingles(typename Checker<graph_t>::Zykov* zykovRoot, std::vector<std::vector<long>>& roomData, bool shouldPrint);
 
   public:
     Checker(graph_t* graph, std::vector<std::vector<long>>& roomData) 
@@ -104,8 +105,7 @@ namespace Coloring {// begin namespace Coloring
       std::priority_queue<Zykov*, std::vector<Zykov*>, ZykovPtrComparator> searchQueue;
       // Create root Zykov, ry.
       Zykov* root = new Zykov(_originalGraph->cloneHeap(), _initialVertexCount, this);
-      auto contracted = Optimization::contractUnitIntersectionSingles<graph_t>(root);
-      
+      auto contracted = Optimization::contractUnitIntersectionSingles<graph_t>(root, this->roomData);
 
       { // get data for output
         graph_t* preG = root->getGraph();
@@ -135,8 +135,10 @@ namespace Coloring {// begin namespace Coloring
             processedNodeStatistics[Validator::INVALID_TIMESLOT_PIGEONHOLE];
           out.prunedRooms =
             processedNodeStatistics[Validator::INVALID_ROOM_COLORING] +
-            processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE];
+            processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE] +
+            processedNodeStatistics[Validator::INVALID_JOINING];
 
+          out.badCliqueCallback = removedFromQueueCount;
 
           // cleanup 
           while (!searchQueue.empty()) {
@@ -251,8 +253,10 @@ namespace Coloring {// begin namespace Coloring
 
       out.prunedRooms =
         processedNodeStatistics[Validator::INVALID_ROOM_COLORING] +
-        processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE];
+        processedNodeStatistics[Validator::INVALID_ROOM_PIGEONHOLE] +
+        processedNodeStatistics[Validator::INVALID_JOINING];
 
+      out.badCliqueCallback = removedFromQueueCount;
       return _output;
     }
 
@@ -275,6 +279,7 @@ namespace Coloring {// begin namespace Coloring
     long _bestAnswer;
     long _initialVertexCount;
     long extraValidationStepCounter = { 0 };
+    long removedFromQueueCount{ 0 };
     bool hasSolution{ false };
     ColoringOutput _output{ DEFAULT_NO_SOLUTION };
 
@@ -396,7 +401,6 @@ namespace Coloring {// begin namespace Coloring
       }
 
       std::vector<Zykov*>duplicateQueue;
-
       for (Zykov* currentNode : extractQueue) {
 
         Graph<edge, vertex>& currentGraph = *currentNode->getGraph();
@@ -445,9 +449,24 @@ namespace Coloring {// begin namespace Coloring
 
         if (!sameClique) {
           duplicateQueue.push_back(currentNode); // keep it — it’s different
+          continue;
+        }
+
+        for (long v : badClique) {
+          auto a = badGraph.getVertexData(v);
+          auto b = currentGraph.getVertexData(v);
+          std::sort(a.begin(), a.end());
+          std::sort(b.begin(), b.end());
+          if (a != b) { sameClique = false;  break; }
+        }
+        
+        if (!sameClique) {
+          duplicateQueue.push_back(currentNode); 
         }
         else // if sameClique == true, skip reinsertion, clique is invalid.
+        { 
           delete currentNode; 
+        }
       }
 
       for (Zykov* node : duplicateQueue) {
@@ -459,10 +478,13 @@ namespace Coloring {// begin namespace Coloring
         << removed
         << " nodes with duplicate bad clique\n";
 
-      //for (auto node : badClique) {
-        //std::cout << "BAD CLIQUE VERTEX: " << badGraph.getVertexLabel(node) <<  " " << node << '\n';
-     // }
 
+      removedFromQueueCount += removed;
+      /*
+      for (auto node : badClique) {
+        std::cout << "BAD CLIQUE VERTEX: " << badGraph.getVertexLabel(node) <<  " " << node << '\n';
+      }
+      */
     }
 
     void writeSolution(Zykov* leafNode) {
@@ -585,7 +607,7 @@ namespace Coloring {// begin namespace Coloring
     long getNodeDepth() const { return _depth; }
     Graph<edge, vertex>* getGraph() const { return _graph; }
     std::string getVertexLabel(long index) const { return _graph->getVertexLabel(index); }
-    void setVertexCount(long count) { _currentVertexCount = count; std::cout << "SET TO " << count << '\n'; } // used only in Checker::contractUnitIntersectionSingles
+    void setVertexCount(long count) { _currentVertexCount = count;} // used only in Checker::contractUnitIntersectionSingles
 
     std::vector<long> getJoinedVerticesFromClique(const  std::vector<long>& clique) {
       std::vector<long> output(clique);
@@ -653,7 +675,11 @@ namespace Coloring {// begin namespace Coloring
       //std::vector<long>TEST({ 265,215,1,214,282,18,3 });
       //std::cout << "IS TEST A CLIQUE?" << isThisAClique(TEST, this->_graph) << '\n';
       //std::cout << "EXPLORING NODE! " << this->_lastOperation << " AT DEPTH: " << this->_depth << '\n';
-      
+      Optimization::propagateSingleColorConstraints(_graph, false);
+      Optimization::preprocessNonJoinableEdges(_graph, false);
+      //Optimization::sameTimeDifferentRoomsOptimization(_graph, _checkerPtr->roomData, true);
+      Optimization::contractUnitIntersectionSingles<graph_t>(this, _checkerPtr->roomData, false);
+     
       // Validate multiple random cliques for more aggressive pruning
       const int NUM_CLIQUES_TO_VALIDATE = 5;
       std::vector<long> largestClique;
@@ -677,7 +703,7 @@ namespace Coloring {// begin namespace Coloring
         }
       }
       _lowerBound = std::max(_lowerBound, (double)largestClique.size());
-      edgeAdditionOptimization(largestClique);
+      //edgeAdditionOptimization(largestClique);
       
       
       // this returns {-1, -1} if no valid vertex pair is found
@@ -698,10 +724,11 @@ namespace Coloring {// begin namespace Coloring
       }
 
       //std::cout << "FOUND " << nonNeighboringVertices.first << " AND " << nonNeighboringVertices.second << '\n';
-
+      long x = nonNeighboringVertices.first;
+      long y = nonNeighboringVertices.second;
       // Child 1: Add edge
       Zykov* addEdgeChild = new Zykov(*_graph, nonNeighboringVertices, edge{ 1 }, this);
-      auto addEdgeClique = addEdgeChild->_graph->findCliqueRandom({ nonNeighboringVertices.first, nonNeighboringVertices.second });
+      auto addEdgeClique = addEdgeChild->_graph->findCliqueRandom({ x, y });
       auto addEdgeValidation = Validator::clique<edge, vertex>(addEdgeClique, *addEdgeChild->_graph, _checkerPtr->roomData);
       if (addEdgeValidation == Validator::VALID) {
         searchQueue.push(addEdgeChild);
@@ -711,11 +738,12 @@ namespace Coloring {// begin namespace Coloring
         delete addEdgeChild;
       }
 
-      if ((*_graph).areJoinable(nonNeighboringVertices.first, nonNeighboringVertices.second)) {
+      if ((*_graph).areJoinable(x, y) && 
+        Validator::canJoinBasedOnRoomConstraint(x,y, *_graph, _checkerPtr->roomData)) {
         // Child 2: Contract vertices  
         Zykov* contractChild = new Zykov(*_graph, nonNeighboringVertices, this);
         Graph<edge, vertex>& contractGraph = *contractChild->_graph;
-        auto contractClique = contractGraph.findCliqueRandom({ contractGraph.getRoot(nonNeighboringVertices.first) });
+        auto contractClique = contractGraph.findCliqueRandom({ contractGraph.getRoot(x) });
         auto contractValidation = Validator::clique<edge, vertex>(contractClique, *contractChild->_graph, _checkerPtr->roomData);
 
         if (contractValidation == Validator::VALID) {
@@ -751,7 +779,7 @@ namespace Coloring {// begin namespace Coloring
       }
 
       _upperBound = maxDegree + 1; // degree-based upper bound
-      
+      // std::cout << " CURRENT == " << _currentVertexCount << " REAL == " << graph.getRoots().size() << '\n';
       double V = static_cast<double>(_currentVertexCount);
       double E = static_cast<double>(graph.getEdgeCount());
       _graphDensity = E / (V * (V - 1));
