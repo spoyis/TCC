@@ -142,7 +142,7 @@ namespace Coloring::Optimization {
           auto& Lj = g.getVertexData(rj);
           if (Lj.size() != 1) continue;
 
-          if (Li[0] == Lj[0]) {
+          if (Li[0] == Lj[0] && Validator::canJoinBasedOnRoomConstraint(ri,rj, g, roomData)) {
             g.joinVertices(ri, rj);
             counter++;
             changed = true;

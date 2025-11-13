@@ -300,6 +300,25 @@ namespace Coloring::Validator { // begin namespace Coloring::Validator
       }
     }
     std::cout << PASS << "UNIQUE COLOR PAIR VALIDATION " << std::endl;
+
+    // --- [4] Adjacent vertices must not share the same timeslot color ---
+    for (long u = 0; u < vertexCount; ++u) {
+      for (long v = u + 1; v < vertexCount; ++v) {
+
+        if (!g[u][v]) continue; // skip non-neighbors
+
+        long t_u = output[u].timeslotColor;
+        long t_v = output[v].timeslotColor;
+
+        if (t_u == t_v) {
+          std::cerr << FAIL << "[ERROR] Adjacent vertices " << u << " and " << v
+            << " both have timeslot color " << t_u << ".\n";
+
+          return false;
+        }
+      }
+    }
+    std::cout << PASS << "NO NEIGHBORS SHARE COLORS VALIDATION " << std::endl;
     // If we reach here, all checks passed
     return true;
   }

@@ -419,23 +419,8 @@ namespace Coloring {// begin namespace Coloring
           continue;
         }
 
-        // check 2: all non-root vertices in badVertices have same root in both
-        for (long v : badVertices) {
-          
-          long rBad = badGraph.getRoot(v);
-          long rCur = currentGraph.getRoot(v);
-          if (rBad != rCur) {
-            sameClique = false;
-            break;
-          }
-        }
 
-        if (!sameClique) {
-          duplicateQueue.push_back(currentNode);
-          continue;
-        }
-
-        // check 3: the roots in badClique form the same clique in current
+        // check 2: the roots in badClique form the same clique in current
         for (long i = 0; i < badClique.size() && sameClique; ++i) {
           for (long j = i + 1; j < badClique.size(); ++j) {
             long a = badClique[i];
@@ -452,15 +437,9 @@ namespace Coloring {// begin namespace Coloring
           continue;
         }
 
-        for (long v : badClique) {
-          auto a = badGraph.getVertexData(v);
-          auto b = currentGraph.getVertexData(v);
-          std::sort(a.begin(), a.end());
-          std::sort(b.begin(), b.end());
-          if (a != b) { sameClique = false;  break; }
-        }
+        auto validation = Validator::clique(badClique, currentGraph, roomData);
         
-        if (!sameClique) {
+        if (validation == Validator::VALID) {
           duplicateQueue.push_back(currentNode); 
         }
         else // if sameClique == true, skip reinsertion, clique is invalid.
